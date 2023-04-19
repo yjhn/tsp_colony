@@ -1,9 +1,20 @@
+#![allow(dead_code, unreachable_code, unused)]
+
+mod ant;
+mod ant_cycle;
 mod arguments;
+mod matrix;
+mod pheromone_matrix;
+mod tour;
+mod tsp_problem;
+mod utils;
 
 use crate::arguments::Args;
 use clap::Parser;
 
 mod config {
+    use rand::rngs::SmallRng;
+
     // α: the relative importance of the trail, α ≥ 0
     pub const ALPHA: f32 = 0.5;
     // β: the relative importance of the visibility, β ≥ 0
@@ -22,6 +33,8 @@ mod config {
     pub const REPEAT_TIMES: u32 = 10;
     // Benchmark results directory.
     pub const RESULTS_DIR: &str = "results";
+
+    pub type RNG = SmallRng;
 }
 
 fn main() {
@@ -40,4 +53,7 @@ fn main() {
         population_sizes,
         dup,
     } = args;
+    // We will use beta to raise the d_ij, not 1/d_ij,
+    // so it must be negative to get the same results.
+    let beta = -beta;
 }

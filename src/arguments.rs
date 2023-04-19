@@ -1,5 +1,3 @@
-use std::ffi::OsStr;
-
 use clap::{Parser, ValueEnum};
 
 use crate::config;
