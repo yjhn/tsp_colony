@@ -3,8 +3,9 @@
 mod ant;
 mod ant_cycle;
 mod arguments;
+mod distance_matrix;
 mod matrix;
-mod pheromone_matrix;
+mod pheromone_visibility_matrix;
 mod tour;
 mod tsp_problem;
 mod utils;
@@ -53,7 +54,4 @@ fn main() {
         population_sizes,
         dup,
     } = args;
-    // We will use beta to raise the d_ij, not 1/d_ij,
-    // so it must be negative to get the same results.
-    let beta = -beta;
 }

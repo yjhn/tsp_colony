@@ -8,7 +8,9 @@ use rand::rngs::SmallRng;
 use rand::Rng;
 use rand::SeedableRng;
 
+use crate::distance_matrix::DistanceMatrix;
 use crate::matrix::SquareMatrix;
+use crate::tour::CityIndex;
 
 // For randomly generated problems
 const MIN_CITY_COORD: f64 = 0.0;
@@ -18,7 +20,7 @@ const MAX_CITY_COORD: f64 = 1000.0;
 pub struct TspProblem {
     name: String,
     cities: Vec<Point>,
-    distances: SquareMatrix<u32>,
+    distances: DistanceMatrix,
 }
 
 impl TspProblem {
@@ -63,7 +65,7 @@ impl TspProblem {
         self.cities.len()
     }
 
-    pub fn distances(&self) -> &SquareMatrix<u32> {
+    pub fn distances(&self) -> &DistanceMatrix {
         &self.distances
     }
 
@@ -71,8 +73,8 @@ impl TspProblem {
         &self.name
     }
 
-    fn calculate_distances(city_count: usize, tsp: &Tsp) -> SquareMatrix<u32> {
-        let mut distances = SquareMatrix::new(city_count, 0);
+    fn calculate_distances(city_count: usize, tsp: &Tsp) -> DistanceMatrix {
+        let mut distances = DistanceMatrix::new(city_count);
 
         // tspf indices start from 1
         for ind1 in 1..=city_count {
@@ -105,8 +107,8 @@ impl TspProblem {
                     WeightKind::Custom => unimplemented!(),
                     WeightKind::Undefined => unimplemented!(),
                 };
-                distances[(ind1 - 1, ind2 - 1)] = dist;
-                distances[(ind2 - 1, ind1 - 1)] = dist;
+                distances[(CityIndex::new(ind1 - 1), CityIndex::new(ind2 - 1))] = dist;
+                distances[(CityIndex::new(ind2 - 1), CityIndex::new(ind1 - 1))] = dist;
             }
         }
         distances
@@ -122,7 +124,7 @@ fn nint(f: f64) -> u32 {
 fn generate_cities<R: Rng + SeedableRng>(
     city_count: usize,
     rng: &mut R,
-) -> (Vec<Point>, SquareMatrix<u32>) {
+) -> (Vec<Point>, DistanceMatrix) {
     let mut cities = Vec::with_capacity(city_count);
 
     // Generate some cities
@@ -132,14 +134,14 @@ fn generate_cities<R: Rng + SeedableRng>(
     }
 
     // Calculate distances (Euclidean plane)
-    let mut distances = SquareMatrix::new(city_count, 0);
+    let mut distances = DistanceMatrix::new(city_count);
 
     for i in 0..city_count {
         for j in (i + 1)..city_count {
             let distance_f64 = Point::distance(cities[i], cities[j]);
             let distance = nint(distance_f64);
-            distances[(i, j)] = distance;
-            distances[(j, i)] = distance;
+            distances[(CityIndex::new(i), CityIndex::new(j))] = distance;
+            distances[(CityIndex::new(j), CityIndex::new(i))] = distance;
         }
     }
 

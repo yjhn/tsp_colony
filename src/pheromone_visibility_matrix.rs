@@ -1,14 +1,35 @@
 use std::ops::Index;
 
-use crate::{config, matrix::SquareMatrix, tour::CityIndex, tour::Tour, utils::order};
+use crate::{
+    config, distance_matrix::DistanceMatrix, matrix::SquareMatrix, tour::CityIndex, tour::Tour,
+    utils::order,
+};
 
 type PheromoneAmountT = f32;
 
-pub struct PheromoneMatrix(SquareMatrix<PheromoneAmountT>);
+/// Upper right triangle: pheromone level.
+/// Lower left triangle: visility.powf(beta).
+pub struct PheromoneVisibilityMatrix(SquareMatrix<PheromoneAmountT>);
 
-impl PheromoneMatrix {
-    pub fn new(side_length: usize, init_value: PheromoneAmountT) -> PheromoneMatrix {
-        PheromoneMatrix(SquareMatrix::new(side_length, init_value))
+impl PheromoneVisibilityMatrix {
+    pub fn new(
+        side_length: usize,
+        init_value: PheromoneAmountT,
+        distances: &DistanceMatrix,
+        beta: f32,
+    ) -> PheromoneVisibilityMatrix {
+        let mut matrix = SquareMatrix::new(side_length, init_value);
+
+        // Pheromone level is already set when SquareMatrix is initialized.
+        // Set lower left triangle: visibility.powf(beta).
+        for y in 0..side_length {
+            for x in 0..y {
+                // We will use beta to raise the d_ij, not 1/d_ij,
+                // so it must be negative to get the same results.
+                matrix[(x, y)] = (distances[(x, y)] as PheromoneAmountT).powf(-beta);
+            }
+        }
+        PheromoneVisibilityMatrix(matrix)
     }
 
     pub fn side_length(&self) -> usize {
@@ -52,26 +73,18 @@ impl PheromoneMatrix {
         // All values in probability matrix must always be in range [0..1].
         // self.0[(h, l)] = f64::clamp(val, 0.0, 1.0)
     }
-}
 
-// First number must be higher than second.
-impl Index<(usize, usize)> for PheromoneMatrix {
-    type Output = PheromoneAmountT;
-
-    fn index(&self, (x, y): (usize, usize)) -> &Self::Output {
+    // x must be higher than y
+    pub fn get_pheromone(&self, (x, y): (CityIndex, CityIndex)) -> PheromoneAmountT {
         debug_assert!(x > y);
 
-        &self.0[(x, y)]
+        self.0[(x.get(), y.get())]
     }
-}
 
-// First number must be higher than second.
-impl Index<(CityIndex, CityIndex)> for PheromoneMatrix {
-    type Output = PheromoneAmountT;
+    // x must be lower than y
+    pub fn get_visibility(&self, (x, y): (CityIndex, CityIndex)) -> PheromoneAmountT {
+        debug_assert!(x < y);
 
-    fn index(&self, (x, y): (CityIndex, CityIndex)) -> &Self::Output {
-        debug_assert!(x > y);
-
-        &self.0[(x.get(), y.get())]
+        self.0[(x.get(), y.get())]
     }
 }

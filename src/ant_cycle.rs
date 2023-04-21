@@ -3,7 +3,7 @@ use rand::{distributions, prelude::Distribution, Rng, SeedableRng};
 use crate::{
     ant::Ant,
     matrix::SquareMatrix,
-    pheromone_matrix::PheromoneMatrix,
+    pheromone_visibility_matrix::PheromoneVisibilityMatrix,
     tour::{CityIndex, Tour},
     tsp_problem::TspProblem,
 };
@@ -15,8 +15,9 @@ pub struct AntCycle<R: Rng + SeedableRng> {
     ants: Vec<Ant>,
     rng: R,
     best_tour: Tour,
-    pheromone_matrix: PheromoneMatrix,
+    pheromone_matrix: PheromoneVisibilityMatrix,
     tsp_problem: TspProblem,
+    alpha: f32,
 }
 
 impl<R: Rng + SeedableRng> AntCycle<R> {
@@ -26,8 +27,15 @@ impl<R: Rng + SeedableRng> AntCycle<R> {
         city_count: usize,
         tsp_problem: TspProblem,
         initial_trail_intensity: f32,
+        alpha: f32,
+        beta: f32,
     ) -> AntCycle<R> {
-        let pheromone_matrix = PheromoneMatrix::new(city_count, initial_trail_intensity);
+        let pheromone_matrix = PheromoneVisibilityMatrix::new(
+            city_count,
+            initial_trail_intensity,
+            tsp_problem.distances(),
+            beta,
+        );
         let mut ants = Vec::with_capacity(ant_count);
         let distrib = distributions::Uniform::new(0, city_count)
             .unwrap()
@@ -47,6 +55,7 @@ impl<R: Rng + SeedableRng> AntCycle<R> {
             best_tour: Tour::PLACEHOLDER,
             pheromone_matrix,
             tsp_problem,
+            alpha,
         }
     }
 
@@ -54,7 +63,7 @@ impl<R: Rng + SeedableRng> AntCycle<R> {
         self.iteration += 1;
         for c in 0..self.tsp_problem.number_of_cities() {
             for a in self.ants.iter_mut() {
-                a.choose_next_city(&mut self.rng, &self.pheromone_matrix);
+                a.choose_next_city(&mut self.rng, &self.pheromone_matrix, self.alpha);
             }
         }
 
@@ -71,7 +80,7 @@ impl<R: Rng + SeedableRng> AntCycle<R> {
 
             for c in 1..self.tsp_problem.number_of_cities() {
                 for a in self.ants.iter_mut() {
-                    a.choose_next_city(&mut self.rng, &self.pheromone_matrix);
+                    a.choose_next_city(&mut self.rng, &self.pheromone_matrix, self.alpha);
                 }
             }
         }
