@@ -9,7 +9,10 @@ type PheromoneAmountT = f32;
 
 /// Upper right triangle: pheromone level.
 /// Lower left triangle: visility.powf(beta).
-pub struct PheromoneVisibilityMatrix(SquareMatrix<PheromoneAmountT>);
+pub struct PheromoneVisibilityMatrix {
+    matrix: SquareMatrix<PheromoneAmountT>,
+    ro: f32,
+}
 
 impl PheromoneVisibilityMatrix {
     pub fn new(
@@ -17,6 +20,7 @@ impl PheromoneVisibilityMatrix {
         init_value: PheromoneAmountT,
         distances: &DistanceMatrix,
         beta: f32,
+        ro: f32,
     ) -> PheromoneVisibilityMatrix {
         let mut matrix = SquareMatrix::new(side_length, init_value);
 
@@ -29,11 +33,11 @@ impl PheromoneVisibilityMatrix {
                 matrix[(x, y)] = (distances[(x, y)] as PheromoneAmountT).powf(-beta);
             }
         }
-        PheromoneVisibilityMatrix(matrix)
+        PheromoneVisibilityMatrix { matrix, ro }
     }
 
     pub fn side_length(&self) -> usize {
-        self.0.side_length()
+        self.matrix.side_length()
     }
 
     pub fn decrease_tour_pheromone(&mut self, t: &Tour) {
@@ -75,16 +79,30 @@ impl PheromoneVisibilityMatrix {
     }
 
     // x must be higher than y
-    pub fn get_pheromone(&self, (x, y): (CityIndex, CityIndex)) -> PheromoneAmountT {
+    pub fn pheromone(&self, (x, y): (CityIndex, CityIndex)) -> PheromoneAmountT {
         debug_assert!(x > y);
 
-        self.0[(x.get(), y.get())]
+        self.matrix[(x.get(), y.get())]
     }
 
     // x must be lower than y
-    pub fn get_visibility(&self, (x, y): (CityIndex, CityIndex)) -> PheromoneAmountT {
+    pub fn visibility(&self, (x, y): (CityIndex, CityIndex)) -> PheromoneAmountT {
         debug_assert!(x < y);
 
-        self.0[(x.get(), y.get())]
+        self.matrix[(x.get(), y.get())]
+    }
+
+    pub fn adjust_pheromone(&mut self, (x, y): (CityIndex, CityIndex), delta_tau: f32) {
+        debug_assert!(x > y);
+
+        self.matrix[(x.get(), y.get())] += delta_tau;
+    }
+
+    pub fn evaporate_pheromone(&mut self) {
+        for x in 0..self.matrix.side_length() {
+            for y in 0..x {
+                self.matrix[(x, y)] *= self.ro;
+            }
+        }
     }
 }

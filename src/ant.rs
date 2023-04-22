@@ -1,16 +1,21 @@
-use rand::{seq::SliceRandom, Rng, SeedableRng};
+use rand::{distributions::Uniform, prelude::Distribution, seq::SliceRandom, Rng, SeedableRng};
 
 use crate::{
     distance_matrix::DistanceMatrix,
     matrix::SquareMatrix,
     pheromone_visibility_matrix::{self, PheromoneVisibilityMatrix},
-    tour::CityIndex,
-    utils::{all_cities, order},
+    tour::{CityIndex, Length, Tour},
+    utils::{all_cities, all_cities_reuse, order, reverse_order},
 };
 
 pub struct Ant {
+    // TODO: maybe use one vec for both visited and unvisited cities.
+    // Unvisited cities would be at the front, and the tour would grow from the back
+    // or vice-versa.
     unvisited_cities: Vec<CityIndex>,
     tour: Vec<CityIndex>,
+    tour_length: u32,
+    // TODO: maybe rmove current_city, since it is always the same as the last element in tour?
     current_city: CityIndex,
 }
 
@@ -23,53 +28,90 @@ impl Ant {
         Ant {
             unvisited_cities,
             tour,
+            tour_length: u32::MAX,
             current_city: starting_city,
         }
     }
 
     pub fn reset_to_city(&mut self, city_count: usize, starting_city: CityIndex) {
-        self.unvisited_cities = all_cities(city_count);
-        self.current_city = starting_city;
+        self.tour.clear();
+        self.tour_length = u32::MAX;
+        all_cities_reuse(&mut self.unvisited_cities, city_count);
+        self.visit_city(starting_city, starting_city.get());
     }
 
-    pub fn update_pheromones(&self, pheromone_matrix: &PheromoneVisibilityMatrix) {
-        todo!()
+    /// `idx` - index in unvisited cities `Vec`.
+    fn visit_city(&mut self, city: CityIndex, idx: usize) {
+        self.current_city = city;
+        self.unvisited_cities.swap_remove(idx);
+        self.tour.push(city);
+    }
+
+    pub fn update_pheromone(&self, pheromone_matrix: &mut PheromoneVisibilityMatrix, q: f32) {
+        let delta_tau = q / self.tour_length as f32;
+        for path in self.tour.windows(2) {
+            if let &[c1, c2] = path {
+                pheromone_matrix.adjust_pheromone(reverse_order(c1, c2), delta_tau);
+            }
+        }
+        // Last path.
+        pheromone_matrix.adjust_pheromone(
+            reverse_order(self.tour[0], *self.tour.last().unwrap()),
+            delta_tau,
+        );
+    }
+
+    /// Calculates and caches tour length.
+    pub fn tour_length(&mut self, distances: &DistanceMatrix) -> u32 {
+        if self.tour_length == u32::MAX {
+            self.tour_length = self.tour.calculate_tour_length(distances)
+        }
+        self.tour_length
     }
 
     // Sums pheromone levels raised to alpha * distances raised to beta
     // for all unvisited cities (divisor in formula 4 in the paper).
-    // beta MUST BE negative
-    pub fn sum_tau(&self, pheromone_matrix: &PheromoneVisibilityMatrix, alpha: f32) -> f32 {
+    pub fn sum_tau(&self, matrix: &PheromoneVisibilityMatrix, alpha: f32) -> f32 {
         self.unvisited_cities
             .iter()
             .copied()
             .map(|city| {
                 let ord = order(city, self.current_city);
-                pheromone_matrix.get_pheromone(ord).powf(alpha)
-                    * pheromone_matrix.get_visibility(ord)
+                matrix.pheromone(ord).powf(alpha) * matrix.visibility(ord)
             })
             .sum()
     }
 
-    // This function does not check if the city has already been visited.
     pub fn choose_next_city<R: Rng + SeedableRng>(
         &mut self,
         rng: &mut R,
-        pheromone_matrix: &PheromoneVisibilityMatrix,
+        matrix: &PheromoneVisibilityMatrix,
         alpha: f32,
-    ) -> f32 {
+    ) {
         self.unvisited_cities.shuffle(rng);
         // TODO: 4 formulė straipsnyje
-        let divisor = self.sum_tau(pheromone_matrix, alpha);
+        let divisor = self.sum_tau(matrix, alpha);
         // TODO: gal pasidaryti ir čia uniform distribution? Bet neaišku, kiek kartų bus naudojama...
+        let distrib = Uniform::new(0.0, 1.0).unwrap();
 
-        for city in self.unvisited_cities.iter().copied() {
+        for idx in 0..self.unvisited_cities.len() {
+            let city = self.unvisited_cities[idx];
             let ord = order(city, self.current_city);
-            let dividend = pheromone_matrix.get_pheromone(ord).powf(alpha)
-                * pheromone_matrix.get_visibility(ord);
+            let dividend = matrix.pheromone(ord).powf(alpha) * matrix.visibility(ord);
             let p = dividend / divisor;
+            if p > distrib.sample(rng) {
+                // This city is the chosen one.
+                self.visit_city(city, idx);
+                return;
+            }
         }
+    }
 
-        todo!()
+    /// Clones the ant's tour.
+    pub fn clone_tour(&self) -> crate::tour::Tour {
+        // Length must be already calculated.
+        debug_assert!(self.tour_length != u32::MAX);
+
+        Tour::clone_from_cities(&self.tour, self.tour_length)
     }
 }

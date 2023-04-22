@@ -1,3 +1,4 @@
+use crate::distance_matrix::DistanceMatrix;
 use crate::matrix::SquareMatrix;
 use crate::utils::all_cities;
 use rand::prelude::SliceRandom;
@@ -47,7 +48,7 @@ impl Tour {
         &self.cities
     }
 
-    pub fn from_cities(cities: Vec<CityIndex>, distances: &SquareMatrix<u32>) -> Tour {
+    pub fn from_cities(cities: Vec<CityIndex>, distances: &DistanceMatrix) -> Tour {
         let tour_length = cities.calculate_tour_length(distances);
 
         Tour {
@@ -68,7 +69,7 @@ impl Tour {
         }
     }
 
-    pub fn random(city_count: usize, distances: &SquareMatrix<u32>, rng: &mut impl Rng) -> Tour {
+    pub fn random(city_count: usize, distances: &DistanceMatrix, rng: &mut impl Rng) -> Tour {
         assert!(city_count > 1);
 
         let mut cities = all_cities(city_count);
@@ -177,16 +178,25 @@ impl Tour {
     pub fn paths(&self) -> Windows<'_, CityIndex> {
         self.cities.windows(2)
     }
+
+    /// Creates a new `Tour` by cloning the provided slice. Trusts that the `length`
+    /// is correct.
+    pub fn clone_from_cities(tour: &[CityIndex], length: u32) -> Tour {
+        Tour {
+            cities: tour.to_owned(),
+            tour_length: length,
+        }
+    }
 }
 
 pub trait Length {
-    fn calculate_tour_length(&self, distances: &SquareMatrix<u32>) -> u32;
+    fn calculate_tour_length(&self, distances: &DistanceMatrix) -> u32;
 
     fn hack_get_tour_length_from_last_element(&self) -> u32;
 }
 
 impl Length for [CityIndex] {
-    fn calculate_tour_length(&self, distances: &SquareMatrix<u32>) -> u32 {
+    fn calculate_tour_length(&self, distances: &DistanceMatrix) -> u32 {
         assert!(self.len() > 1);
 
         let mut tour_length = 0;

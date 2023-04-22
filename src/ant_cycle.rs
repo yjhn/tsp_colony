@@ -18,6 +18,7 @@ pub struct AntCycle<R: Rng + SeedableRng> {
     pheromone_matrix: PheromoneVisibilityMatrix,
     tsp_problem: TspProblem,
     alpha: f32,
+    q: f32,
 }
 
 impl<R: Rng + SeedableRng> AntCycle<R> {
@@ -29,19 +30,22 @@ impl<R: Rng + SeedableRng> AntCycle<R> {
         initial_trail_intensity: f32,
         alpha: f32,
         beta: f32,
+        q: f32,
+        ro: f32,
     ) -> AntCycle<R> {
         let pheromone_matrix = PheromoneVisibilityMatrix::new(
             city_count,
             initial_trail_intensity,
             tsp_problem.distances(),
             beta,
+            ro,
         );
         let mut ants = Vec::with_capacity(ant_count);
         let distrib = distributions::Uniform::new(0, city_count)
             .unwrap()
             .sample_iter(&mut rng)
             .map(CityIndex::new);
-        for (_, random_city) in (0..ant_count).zip(distrib) {
+        for random_city in distrib.take(ant_count) {
             let ant = Ant::new(city_count, random_city);
             ants.push(ant);
         }
@@ -56,10 +60,12 @@ impl<R: Rng + SeedableRng> AntCycle<R> {
             pheromone_matrix,
             tsp_problem,
             alpha,
+            q,
         }
     }
 
-    pub fn iterate_until_optimal(&mut self, max_iterations: u32) {
+    pub fn iterate_until_optimal(&mut self, max_iterations: u32, optimal_length: u32) {
+        // First iteration
         self.iteration += 1;
         for c in 0..self.tsp_problem.number_of_cities() {
             for a in self.ants.iter_mut() {
@@ -69,19 +75,77 @@ impl<R: Rng + SeedableRng> AntCycle<R> {
 
         let num_cities = self.tsp_problem.number_of_cities();
         let mut distrib = distributions::Uniform::new(0, num_cities).unwrap();
+
+        struct ShortestIterationTour {
+            ant_idx: usize,
+            tour_length: u32,
+        }
+
+        // Keep track of the shortest tour found so far.
+        let mut shortest_tour = Tour::PLACEHOLDER;
         loop {
-            self.iteration += 1;
-            if self.iteration == max_iterations || todo!() {
-                break;
-            }
-            for a in self.ants.iter_mut() {
-                a.reset_to_city(num_cities, CityIndex::new(distrib.sample(&mut self.rng)));
+            // TODO: gal precomputint pheromone.powf(alpha)? Vis tiek jis keičiasi tik tik kitoje iteracijoje.
+            // Each ant constructs a tour, keep track of the shortest tour found in this iteration.
+            let mut short = ShortestIterationTour {
+                ant_idx: 0,
+                tour_length: self.ants[0].tour_length(self.tsp_problem.distances()),
+            };
+
+            // Colony is stale if all ants find the same tour. Since actually
+            // checking if tours match is expensive, simply check if they are
+            // of the same length.
+            let mut stale = true;
+            for (idx, ant) in self.ants.iter_mut().enumerate() {
+                for c in 1..self.tsp_problem.number_of_cities() {
+                    ant.choose_next_city(&mut self.rng, &self.pheromone_matrix, self.alpha);
+                }
+
+                let len = ant.tour_length(self.tsp_problem.distances());
+                if len < short.tour_length {
+                    stale = false;
+                    short = ShortestIterationTour {
+                        ant_idx: idx,
+                        tour_length: len,
+                    };
+                } else if len > short.tour_length {
+                    stale = false;
+                }
             }
 
-            for c in 1..self.tsp_problem.number_of_cities() {
-                for a in self.ants.iter_mut() {
-                    a.choose_next_city(&mut self.rng, &self.pheromone_matrix, self.alpha);
-                }
+            // Update pheromones.
+            self.pheromone_matrix.evaporate_pheromone();
+            for ant in self.ants.iter() {
+                ant.update_pheromone(&mut self.pheromone_matrix, self.q);
+            }
+
+            // Find the shortest tour.
+            if short.tour_length < shortest_tour.length() {
+                shortest_tour = self.ants[short.ant_idx].clone_tour();
+            }
+
+            if self.iteration == max_iterations {
+                println!("Stopping, reached max iterationis count");
+                break;
+            }
+            if shortest_tour.length() == optimal_length {
+                println!(
+                    "Stopping, reached optimal length in iteration {}",
+                    self.iteration
+                );
+                break;
+            }
+            if stale {
+                println!(
+                    "Stopping, colony is stale (all ants likely found the same tour). Iteration {}",
+                    self.iteration
+                );
+                break;
+            }
+            self.iteration += 1;
+
+            // Reset ants.
+            for a in self.ants.iter_mut() {
+                a.reset_to_city(num_cities, CityIndex::new(distrib.sample(&mut self.rng)));
             }
         }
     }
