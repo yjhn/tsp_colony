@@ -3,12 +3,14 @@
 mod ant;
 mod ant_cycle;
 mod arguments;
+mod benchmark;
 mod config;
 mod distance_matrix;
 mod matrix;
 mod pheromone_visibility_matrix;
 mod tour;
 mod tsp_problem;
+mod tsplib;
 mod utils;
 
 use crate::arguments::Args;
@@ -30,4 +32,6 @@ fn main() {
         population_sizes,
         dup,
     } = args;
+
+    // TODO: bencmarking
 }

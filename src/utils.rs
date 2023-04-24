@@ -1,4 +1,7 @@
 use crate::tour::CityIndex;
+use mpi::collective::Root;
+use mpi::topology::Process;
+use mpi::topology::SystemCommunicator;
 
 // Returns (low, high).
 pub fn order<T: Ord>(a: T, b: T) -> (T, T) {
@@ -30,4 +33,20 @@ pub fn all_cities(count: usize) -> Vec<CityIndex> {
 pub fn all_cities_fill(buf: &mut Vec<CityIndex>, count: usize) {
     buf.clear();
     (0..count).map(|c| buf.push(CityIndex::new(c)));
+}
+
+/// Generates random seed and broadcasts it for every process.
+pub fn initialize_random_seed(
+    root_process: Process<SystemCommunicator>,
+    rank: i32,
+    is_root: bool,
+) -> u64 {
+    // Broadcast global random seed.
+    let mut global_seed_buf = if is_root { [rand::random()] } else { [0] };
+    root_process.broadcast_into(&mut global_seed_buf);
+    let random_seed = global_seed_buf[0] + rank as u64;
+    // if is_root {
+    // println!("Global random seed: {random_seed}");
+    // }
+    random_seed
 }

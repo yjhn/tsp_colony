@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use std::ops::Range;
+use std::str::FromStr;
 use tspf::WeightKind;
 use tspf::{Tsp, TspBuilder};
 
@@ -11,6 +12,7 @@ use rand::SeedableRng;
 use crate::distance_matrix::DistanceMatrix;
 use crate::matrix::SquareMatrix;
 use crate::tour::CityIndex;
+use crate::tsplib::TspLibProblems;
 
 // For randomly generated problems
 const MIN_CITY_COORD: f64 = 0.0;
@@ -21,6 +23,8 @@ pub struct TspProblem {
     name: String,
     cities: Vec<Point>,
     distances: DistanceMatrix,
+    // This will be 0 for custom problems.
+    solution_length: u32,
 }
 
 impl TspProblem {
@@ -28,9 +32,10 @@ impl TspProblem {
         let (cities, distances) = generate_cities(city_count, rng);
 
         TspProblem {
-            name: String::from("random"),
+            name: format!("random{}", rng.gen::<u32>()),
             cities,
             distances,
+            solution_length: 0,
         }
     }
 
@@ -54,10 +59,14 @@ impl TspProblem {
 
         let distances = Self::calculate_distances(number_of_cities, &tsp);
 
+        let name = tsp.name().to_owned();
+        let solution_length = TspLibProblems::from_str(name.as_str()).unwrap() as u32;
+
         TspProblem {
-            name: tsp.name().to_owned(),
+            name,
             cities,
             distances,
+            solution_length,
         }
     }
 
