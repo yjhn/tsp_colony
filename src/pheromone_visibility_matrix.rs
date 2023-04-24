@@ -1,26 +1,28 @@
 use std::ops::Index;
 
 use crate::{
-    config, distance_matrix::DistanceMatrix, matrix::SquareMatrix, tour::CityIndex, tour::Tour,
+    config::{self, Float},
+    distance_matrix::DistanceMatrix,
+    matrix::SquareMatrix,
+    tour::CityIndex,
+    tour::Tour,
     utils::order,
 };
-
-type PheromoneAmountT = f32;
 
 /// Upper right triangle: pheromone level.
 /// Lower left triangle: visility.powf(beta).
 pub struct PheromoneVisibilityMatrix {
-    matrix: SquareMatrix<PheromoneAmountT>,
-    ro: f32,
+    matrix: SquareMatrix<Float>,
+    ro: Float,
 }
 
 impl PheromoneVisibilityMatrix {
     pub fn new(
         side_length: usize,
-        init_value: PheromoneAmountT,
+        init_value: Float,
         distances: &DistanceMatrix,
-        beta: f32,
-        ro: f32,
+        beta: Float,
+        ro: Float,
     ) -> PheromoneVisibilityMatrix {
         let mut matrix = SquareMatrix::new(side_length, init_value);
 
@@ -30,7 +32,7 @@ impl PheromoneVisibilityMatrix {
             for x in 0..y {
                 // We will use beta to raise the d_ij, not 1/d_ij,
                 // so it must be negative to get the same results.
-                matrix[(x, y)] = (distances[(x, y)] as PheromoneAmountT).powf(-beta);
+                matrix[(x, y)] = (distances[(x, y)] as Float).powf(-beta);
             }
         }
         PheromoneVisibilityMatrix { matrix, ro }
@@ -79,20 +81,20 @@ impl PheromoneVisibilityMatrix {
     }
 
     // x must be higher than y
-    pub fn pheromone(&self, (x, y): (CityIndex, CityIndex)) -> PheromoneAmountT {
+    pub fn pheromone(&self, (x, y): (CityIndex, CityIndex)) -> Float {
         debug_assert!(x > y);
 
         self.matrix[(x.get(), y.get())]
     }
 
     // x must be lower than y
-    pub fn visibility(&self, (x, y): (CityIndex, CityIndex)) -> PheromoneAmountT {
+    pub fn visibility(&self, (x, y): (CityIndex, CityIndex)) -> Float {
         debug_assert!(x < y);
 
         self.matrix[(x.get(), y.get())]
     }
 
-    pub fn adjust_pheromone(&mut self, (x, y): (CityIndex, CityIndex), delta_tau: f32) {
+    pub fn adjust_pheromone(&mut self, (x, y): (CityIndex, CityIndex), delta_tau: Float) {
         debug_assert!(x > y);
 
         self.matrix[(x.get(), y.get())] += delta_tau;

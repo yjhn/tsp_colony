@@ -1,6 +1,7 @@
 use rand::{distributions::Uniform, prelude::Distribution, seq::SliceRandom, Rng, SeedableRng};
 
 use crate::{
+    config::Float,
     distance_matrix::DistanceMatrix,
     matrix::SquareMatrix,
     pheromone_visibility_matrix::{self, PheromoneVisibilityMatrix},
@@ -49,10 +50,10 @@ impl Ant {
         self.tour.push(city);
     }
 
-    pub fn update_pheromone(&self, pheromone_matrix: &mut PheromoneVisibilityMatrix, q: f32) {
+    pub fn update_pheromone(&self, pheromone_matrix: &mut PheromoneVisibilityMatrix, q: Float) {
         debug_assert!(self.tour_length < u32::MAX);
 
-        let delta_tau = q / self.tour_length as f32;
+        let delta_tau = q / self.tour_length as Float;
         for path in self.tour.windows(2) {
             if let &[c1, c2] = path {
                 pheromone_matrix.adjust_pheromone(reverse_order(c1, c2), delta_tau);
@@ -75,7 +76,7 @@ impl Ant {
 
     // Sums pheromone levels raised to alpha * distances raised to beta
     // for all unvisited cities (divisor in formula 4 in the paper).
-    pub fn sum_tau(&self, matrix: &PheromoneVisibilityMatrix, alpha: f32) -> f32 {
+    pub fn sum_tau(&self, matrix: &PheromoneVisibilityMatrix, alpha: Float) -> Float {
         self.unvisited_cities
             .iter()
             .copied()
@@ -90,7 +91,7 @@ impl Ant {
         &mut self,
         rng: &mut R,
         matrix: &PheromoneVisibilityMatrix,
-        alpha: f32,
+        alpha: Float,
     ) {
         self.unvisited_cities.shuffle(rng);
         // TODO: 4 formulė straipsnyje

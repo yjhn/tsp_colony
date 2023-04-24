@@ -54,12 +54,15 @@ where
     }
 }
 
-pub trait Float: Copy + Display {}
+/// Trait used for matrix display. Although not stated
+/// here, types implementing this should also support formatting
+/// `{.<number>}`.
+pub trait FloatDisplay: Copy + Display {}
 
-impl Float for f32 {}
-impl Float for f64 {}
+impl FloatDisplay for f32 {}
+impl FloatDisplay for f64 {}
 
-impl<T: Float> Display for SquareMatrix<T> {
+impl<T: FloatDisplay> Display for SquareMatrix<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("--- SquareMatrix<f64> ---\n")?;
         for row in self.data.chunks_exact(self.side_length) {

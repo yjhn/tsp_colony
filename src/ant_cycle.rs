@@ -2,6 +2,7 @@ use rand::{distributions, prelude::Distribution, Rng, SeedableRng};
 
 use crate::{
     ant::Ant,
+    config::Float,
     matrix::SquareMatrix,
     pheromone_visibility_matrix::PheromoneVisibilityMatrix,
     tour::{CityIndex, Tour},
@@ -20,8 +21,8 @@ pub struct AntCycle<R: Rng + SeedableRng> {
     best_tour: Tour,
     pheromone_matrix: PheromoneVisibilityMatrix,
     tsp_problem: TspProblem,
-    alpha: f32,
-    q: f32,
+    alpha: Float,
+    q: Float,
 }
 
 impl<R: Rng + SeedableRng> AntCycle<R> {
@@ -30,11 +31,11 @@ impl<R: Rng + SeedableRng> AntCycle<R> {
         mut rng: R,
         city_count: usize,
         tsp_problem: TspProblem,
-        initial_trail_intensity: f32,
-        alpha: f32,
-        beta: f32,
-        q: f32,
-        ro: f32,
+        initial_trail_intensity: Float,
+        alpha: Float,
+        beta: Float,
+        q: Float,
+        ro: Float,
     ) -> AntCycle<R> {
         let pheromone_matrix = PheromoneVisibilityMatrix::new(
             city_count,

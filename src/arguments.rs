@@ -1,6 +1,6 @@
 use clap::{Parser, ValueEnum};
 
-use crate::config;
+use crate::config::{self, Float};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum DuplicateHandling {
@@ -21,19 +21,19 @@ pub struct Args {
     pub files: Vec<String>,
 
     #[arg(long, required = false, default_value_t = config::ALPHA)]
-    pub alpha: f32,
+    pub alpha: Float,
 
     #[arg(long, required = false, default_value_t = config::BETA)]
-    pub beta: f32,
+    pub beta: Float,
 
     #[arg(long, required = false, default_value_t = config::PERSISTENCE)]
-    pub persistence: f32,
+    pub persistence: Float,
 
     #[arg(long, required = false, default_value_t = config::Q)]
-    pub q: f32,
+    pub q: Float,
 
     #[arg(long, required = false, default_value_t = config::INITIAL_TRAIL_INTENSITY)]
-    pub init_intensity: f32,
+    pub init_intensity: Float,
 
     #[arg(short, long, default_value_t = config::MAX_ITERATIONS)]
     /// Maximum number of generations for obtaining the optimal solution.
