@@ -27,7 +27,7 @@ pub fn all_cities(count: usize) -> Vec<CityIndex> {
 /// Empties `buf` before proceeding.
 /// It is neccessary to take `Vec` instead of slice,
 /// since new elements need to be inserted.
-pub fn all_cities_reuse(buf: &mut Vec<CityIndex>, count: usize) {
+pub fn all_cities_fill(buf: &mut Vec<CityIndex>, count: usize) {
     buf.clear();
     (0..count).map(|c| buf.push(CityIndex::new(c)));
 }

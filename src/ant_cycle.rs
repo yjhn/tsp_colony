@@ -8,8 +8,11 @@ use crate::{
     tsp_problem::TspProblem,
 };
 
+/// Runs the ant cycle algorithm.
 pub struct AntCycle<R: Rng + SeedableRng> {
-    time: u32,
+    /// Current time. Increases by number of cities in each iteration.
+    // TODO: maybe this is not needed?
+    time: usize,
     iteration: u32,
     ant_count: usize,
     ants: Vec<Ant>,
@@ -88,15 +91,15 @@ impl<R: Rng + SeedableRng> AntCycle<R> {
             // Each ant constructs a tour, keep track of the shortest tour found in this iteration.
             let mut short = ShortestIterationTour {
                 ant_idx: 0,
-                tour_length: self.ants[0].tour_length(self.tsp_problem.distances()),
+                tour_length: u32::MAX,
             };
 
             // Colony is stale if all ants find the same tour. Since actually
-            // checking if tours match is expensive, simply check if they are
+            // checking if tours match is expensive, we only check if they are
             // of the same length.
             let mut stale = true;
             for (idx, ant) in self.ants.iter_mut().enumerate() {
-                for c in 1..self.tsp_problem.number_of_cities() {
+                for c in 1..num_cities {
                     ant.choose_next_city(&mut self.rng, &self.pheromone_matrix, self.alpha);
                 }
 
@@ -112,19 +115,19 @@ impl<R: Rng + SeedableRng> AntCycle<R> {
                 }
             }
 
-            // Update pheromones.
+            // Update pheromone.
             self.pheromone_matrix.evaporate_pheromone();
             for ant in self.ants.iter() {
                 ant.update_pheromone(&mut self.pheromone_matrix, self.q);
             }
 
-            // Find the shortest tour.
+            // Keep track of the shortest tour.
             if short.tour_length < shortest_tour.length() {
                 shortest_tour = self.ants[short.ant_idx].clone_tour();
             }
 
             if self.iteration == max_iterations {
-                println!("Stopping, reached max iterationis count");
+                println!("Stopping, reached max iterations count");
                 break;
             }
             if shortest_tour.length() == optimal_length {
@@ -141,7 +144,9 @@ impl<R: Rng + SeedableRng> AntCycle<R> {
                 );
                 break;
             }
+
             self.iteration += 1;
+            self.time += num_cities;
 
             // Reset ants.
             for a in self.ants.iter_mut() {

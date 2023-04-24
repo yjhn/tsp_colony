@@ -5,7 +5,7 @@ use crate::{
     matrix::SquareMatrix,
     pheromone_visibility_matrix::{self, PheromoneVisibilityMatrix},
     tour::{CityIndex, Length, Tour},
-    utils::{all_cities, all_cities_reuse, order, reverse_order},
+    utils::{all_cities, all_cities_fill, order, reverse_order},
 };
 
 pub struct Ant {
@@ -14,6 +14,8 @@ pub struct Ant {
     // or vice-versa.
     unvisited_cities: Vec<CityIndex>,
     tour: Vec<CityIndex>,
+    // It would be cleaner to use Option<u32> here, but then it would have
+    // to be unwrapped frequently.
     tour_length: u32,
     // TODO: maybe rmove current_city, since it is always the same as the last element in tour?
     current_city: CityIndex,
@@ -36,7 +38,7 @@ impl Ant {
     pub fn reset_to_city(&mut self, city_count: usize, starting_city: CityIndex) {
         self.tour.clear();
         self.tour_length = u32::MAX;
-        all_cities_reuse(&mut self.unvisited_cities, city_count);
+        all_cities_fill(&mut self.unvisited_cities, city_count);
         self.visit_city(starting_city, starting_city.get());
     }
 
@@ -48,6 +50,8 @@ impl Ant {
     }
 
     pub fn update_pheromone(&self, pheromone_matrix: &mut PheromoneVisibilityMatrix, q: f32) {
+        debug_assert!(self.tour_length < u32::MAX);
+
         let delta_tau = q / self.tour_length as f32;
         for path in self.tour.windows(2) {
             if let &[c1, c2] = path {
