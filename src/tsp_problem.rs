@@ -89,8 +89,14 @@ impl TspProblem {
         for ind1 in 1..=city_count {
             for ind2 in (ind1 + 1)..=city_count {
                 let dist_f64 = tsp.weight(ind1, ind2);
-                // tsp.weight() returns 0.0 on error.
-                assert!(dist_f64 > 0.0);
+                // TSPLIB problem a280 has two identical cities, ignore this case.
+                if tsp.name() != "a280" {
+                    // tsp.weight() returns 0.0 on error.
+                    assert!(
+                    dist_f64 > 0.0,
+                    "Error calculating distance, tsp.weight({ind1}, {ind2}) returned {dist_f64}"
+                );
+                }
                 // tsp.weight() returns unrounded distances. Distances are defined
                 // to be u32 in TSPLIB95 format, and rounding depends on edge weight type.
                 let dist = match tsp.weight_kind() {
@@ -116,8 +122,7 @@ impl TspProblem {
                     WeightKind::Custom => unimplemented!(),
                     WeightKind::Undefined => unimplemented!(),
                 };
-                distances[(CityIndex::new(ind1 - 1), CityIndex::new(ind2 - 1))] = dist;
-                distances[(CityIndex::new(ind2 - 1), CityIndex::new(ind1 - 1))] = dist;
+                distances.set_dist(CityIndex::new(ind1 - 1), CityIndex::new(ind2 - 1), dist);
             }
         }
         distances
@@ -149,8 +154,7 @@ fn generate_cities<R: Rng + SeedableRng>(
         for j in (i + 1)..city_count {
             let distance_f64 = Point::distance(cities[i], cities[j]);
             let distance = nint(distance_f64);
-            distances[(CityIndex::new(i), CityIndex::new(j))] = distance;
-            distances[(CityIndex::new(j), CityIndex::new(i))] = distance;
+            distances.set_dist(CityIndex::new(i), CityIndex::new(j), distance);
         }
     }
 

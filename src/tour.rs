@@ -144,8 +144,7 @@ impl Tour {
             let mut min_distance = u32::MAX;
             let mut min_distance_city = unused_cities[0];
             let mut min_distance_city_idx = 0;
-            for i in 0..unused_cities.len() {
-                let c = unused_cities[i];
+            for (i, &c) in unused_cities.iter().enumerate() {
                 let dist = distances[(last_added_city, c)];
                 if dist < min_distance {
                     min_distance = dist;

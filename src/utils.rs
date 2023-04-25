@@ -44,9 +44,5 @@ pub fn initialize_random_seed(
     // Broadcast global random seed.
     let mut global_seed_buf = if is_root { [rand::random()] } else { [0] };
     root_process.broadcast_into(&mut global_seed_buf);
-    let random_seed = global_seed_buf[0] + rank as u64;
-    // if is_root {
-    // println!("Global random seed: {random_seed}");
-    // }
-    random_seed
+    global_seed_buf[0] + rank as u64
 }

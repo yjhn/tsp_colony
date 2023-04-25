@@ -12,6 +12,8 @@ pub enum DuplicateHandling {
     SwitchName,
     /// Overwrite old file.
     Overwrite,
+    /// Append to old file.
+    Append,
 }
 
 #[derive(Parser, Debug)]
@@ -20,20 +22,20 @@ pub struct Args {
     /// TSP problem definition files.
     pub files: Vec<String>,
 
-    #[arg(long, required = false, default_value_t = config::ALPHA)]
-    pub alpha: Float,
+    #[arg(long, required = false, num_args(1..))]
+    pub alphas: Vec<Float>,
 
-    #[arg(long, required = false, default_value_t = config::BETA)]
-    pub beta: Float,
+    #[arg(long, required = false, num_args(1..))]
+    pub betas: Vec<Float>,
 
-    #[arg(long, required = false, default_value_t = config::PERSISTENCE)]
-    pub persistence: Float,
+    #[arg(long, required = false, num_args(1..))]
+    pub ros: Vec<Float>,
 
-    #[arg(long, required = false, default_value_t = config::Q)]
-    pub q: Float,
+    #[arg(long, required = false, num_args(1..))]
+    pub qs: Vec<Float>,
 
-    #[arg(long, required = false, default_value_t = config::INITIAL_TRAIL_INTENSITY)]
-    pub init_intensity: Float,
+    #[arg(long, required = false, num_args(1..))]
+    pub init_intensities: Vec<Float>,
 
     #[arg(short, long, default_value_t = config::MAX_ITERATIONS)]
     /// Maximum number of generations for obtaining the optimal solution.
