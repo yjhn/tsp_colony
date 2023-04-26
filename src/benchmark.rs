@@ -99,7 +99,7 @@ pub fn benchmark_ant_cycle<PD, R>(
         let problem = TspProblem::from_file(path);
         for &p in population_sizes {
             for &beta in betas {
-                // Construct the solver here, as nothuing meaningfull will change in
+                // Construct the solver here, as nothing meaningfull will change in
                 // the inner loops.
                 // TODO: reset method on AntCycle
                 // TODO: actually implement parallel ant colony to not waste time.
