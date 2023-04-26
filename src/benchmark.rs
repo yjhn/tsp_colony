@@ -40,22 +40,27 @@ struct ShortProblemDesc<'a> {
     optimal_length: u32,
 }
 
-/// Benchmark results are composed of a single identicla configuration
-/// run multiple times.
 #[derive(Serialize)]
-struct BenchmarkResults<'a, T: Serialize> {
-    benchmark_start_time_millis: u128,
-    benchmark_duration_millis: u128,
+struct BenchmarkConfig<'a, T: Serialize> {
     process_count: i32,
     problem: ShortProblemDesc<'a>,
     algorithm: &'static str,
     algorithm_constants: T,
     repeat_times: u32,
+}
+
+/// Benchmark results are composed of a single identical configuration
+/// run multiple times.
+#[derive(Serialize)]
+struct BenchmarkResults<'a, T: Serialize> {
+    bench_config: BenchmarkConfig<'a, T>,
+    benchmark_start_time_millis: u128,
+    benchmark_duration_millis: u128,
     run_results: Vec<RunResult>,
 }
 
 pub fn benchmark_ant_cycle<PD, R>(
-    paths: &[PD],
+    problem_paths: &[PD],
     world: SystemCommunicator,
     root_process: Process<SystemCommunicator>,
     rank: i32,
@@ -85,25 +90,31 @@ pub fn benchmark_ant_cycle<PD, R>(
         }
 
         eprintln!("MPI processes: {}", world.size());
-        eprintln!("Population size: {population_sizes:?}");
     }
 
-    for path in paths {
+    for path in problem_paths {
         if is_root {
             eprintln!("Problem file name: {path}");
         }
         let problem = TspProblem::from_file(path);
         for &p in population_sizes {
-            for &alpha in alphas {
-                for &beta in betas {
+            for &beta in betas {
+                // Construct the solver here, as nothuing meaningfull will change in
+                // the inner loops.
+                // TODO: reset method on AntCycle
+                // TODO: actually implement parallel ant colony to not waste time.
+
+                for &alpha in alphas {
                     for &q in qs {
                         for &ro in ros {
                             for &intense in init_intensities {
+                                // Figure out where to save the results.
                                 let mut skip = [false];
                                 let save_file_path = if is_root {
                                     let mut save_file_path = format!(
                                         "{dir}/bm_{name}_{cpus}cpus_p{p}_q{q}_a{a}_b{b}_ro{r}_intensity{i}.json",
-                                        dir=results_dir, name=problem.name(), cpus=process_count, p=p, q=q, a=alpha, b=beta, r=ro, i=intense
+                                        dir=results_dir, name=problem.name(), cpus=process_count, p=p, q=q,
+                                        a=alpha, b=beta, r=ro, i=intense
                                     );
                                     match get_output_file_path(
                                         &mut save_file_path,
@@ -123,9 +134,37 @@ pub fn benchmark_ant_cycle<PD, R>(
                                     continue;
                                 }
 
+                                // Run and time the benchmark.
                                 let mut run_results = Vec::new();
                                 let bench_start_absolute = SystemTime::now();
                                 let bench_start = Instant::now();
+
+                                let bench_config = BenchmarkConfig {
+                                    process_count,
+                                    problem: ShortProblemDesc {
+                                        name: problem.name(),
+                                        optimal_length: problem.solution_length(),
+                                    },
+                                    algorithm: "AntCycle",
+                                    algorithm_constants: AntCycleConstants {
+                                        population_size: p,
+                                        alpha,
+                                        beta,
+                                        q,
+                                        ro,
+                                        max_iterations,
+                                        init_intensity: intense,
+                                    },
+                                    repeat_times,
+                                };
+
+                                if is_root {
+                                    eprintln!(
+                                        "{}",
+                                        serde_json::to_string_pretty(&bench_config).unwrap()
+                                    );
+                                }
+
                                 for run_number in 0..repeat_times {
                                     let run_start = Instant::now();
 
@@ -139,6 +178,13 @@ pub fn benchmark_ant_cycle<PD, R>(
                                             iteration_reached: max_iterations,
                                             duration_millis: run_duration.as_millis(),
                                         };
+
+                                        // Dump partial results in case the benchmark is killed before completing all the runs.
+                                        eprintln!(
+                                            "{}",
+                                            serde_json::to_string_pretty(&result).unwrap()
+                                        );
+
                                         run_results.push(result);
                                     }
                                 }
@@ -148,31 +194,18 @@ pub fn benchmark_ant_cycle<PD, R>(
                                 // Output results.
                                 if is_root {
                                     let results = BenchmarkResults {
+                                        bench_config,
                                         benchmark_start_time_millis: bench_start_absolute
                                             .duration_since(UNIX_EPOCH)
                                             .unwrap()
                                             .as_millis(),
                                         benchmark_duration_millis: bench_duration.as_millis(),
-                                        process_count,
-                                        problem: ShortProblemDesc {
-                                            name: problem.name(),
-                                            optimal_length: problem.solution_length(),
-                                        },
-                                        algorithm: "AntCycle",
-                                        algorithm_constants: AntCycleConstants {
-                                            population_size: p,
-                                            alpha,
-                                            beta,
-                                            q,
-                                            ro,
-                                            max_iterations,
-                                            init_intensity: intense,
-                                        },
-                                        repeat_times,
                                         run_results,
                                     };
                                     let json = serde_json::to_string_pretty(&results).unwrap();
-                                    eprintln!("{json}");
+                                    // This is the actual meaningful output, so dump it to stdout
+                                    // instead of stderr (allows to easily redirect it to file).
+                                    println!("{json}");
                                     let mut file =
                                         open_output_file(&save_file_path, duplicate_handling);
                                     eprintln!("Saving results to '{save_file_path}'");
@@ -199,7 +232,7 @@ fn get_output_file_path(
     duplicate_handling: DuplicateHandling,
 ) -> BenchAction {
     if Path::new(&candidate_path).exists() {
-        eprint!("Existing benchmark results file '{candidate_path}' found, ");
+        eprint!("Found existing benchmark results file '{candidate_path}', ");
         match duplicate_handling {
             DuplicateHandling::Panic => {
                 eprintln!("terminating");
@@ -215,7 +248,8 @@ fn get_output_file_path(
                 eprintln!("will save new results to '{candidate_path}'");
             }
             // Handled later.
-            DuplicateHandling::Overwrite | DuplicateHandling::Append => (),
+            DuplicateHandling::Overwrite => eprintln!("overwriting"),
+            DuplicateHandling::Append => eprintln!("appending to it"),
         };
         BenchAction::Continue
     } else {
