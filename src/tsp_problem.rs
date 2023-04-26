@@ -82,6 +82,10 @@ impl TspProblem {
         &self.name
     }
 
+    pub fn solution_length(&self) -> u32 {
+        self.solution_length
+    }
+
     fn calculate_distances(city_count: usize, tsp: &Tsp) -> DistanceMatrix {
         let mut distances = DistanceMatrix::new(city_count);
 
