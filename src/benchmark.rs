@@ -101,13 +101,21 @@ pub fn benchmark_ant_cycle<PD, R>(
             for &beta in betas {
                 // Construct the solver here, as nothing meaningfull will change in
                 // the inner loops.
-                // TODO: reset method on AntCycle
-                // TODO: actually implement parallel ant colony to not waste time.
+                let mut ant_cycle =
+                    AntCycle::new(p as usize, &mut rng, &problem, 0.0, 0.0, beta, 0.0, 0.0);
 
-                for &alpha in alphas {
-                    for &q in qs {
-                        for &ro in ros {
-                            for &intense in init_intensities {
+                for &intense in init_intensities {
+                    ant_cycle.reset_pheromone(intense);
+
+                    for &alpha in alphas {
+                        ant_cycle.set_alpha(alpha);
+
+                        for &q in qs {
+                            ant_cycle.set_q(q);
+
+                            for &ro in ros {
+                                ant_cycle.set_ro(ro);
+
                                 // Figure out where to save the results.
                                 let mut skip = [false];
                                 let save_file_path = if is_root {
@@ -169,13 +177,15 @@ pub fn benchmark_ant_cycle<PD, R>(
                                     let run_start = Instant::now();
 
                                     // todo!("Benchmark logic goes here");
-
+                                    let found_optimal_tour =
+                                        ant_cycle.iterate_until_optimal(max_iterations);
+                                    // Needed returns: found_optimal, shortest_found (per getter), iteration_reached (galima paimti per getter)
                                     if is_root {
                                         let run_duration = run_start.elapsed();
                                         let result = RunResult {
-                                            found_optimal_tour: false,
-                                            shortest_found_tour: 123456789,
-                                            iteration_reached: max_iterations,
+                                            found_optimal_tour,
+                                            shortest_found_tour: ant_cycle.best_tour().length(),
+                                            iteration_reached: ant_cycle.iteration(),
                                             duration_millis: run_duration.as_millis(),
                                         };
 

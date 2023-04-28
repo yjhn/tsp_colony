@@ -370,6 +370,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "iterator_ilp"
+version = "2.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0f660cc0dd07dce8c26986398eb79ba45ff9367d3d83bd624e183d02581aebe"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -504,6 +513,15 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "num-traits"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "578ede34cf02f8924ab9447f50c28075b4d3e5b269972345e7e0372b38c6cdcd"
+dependencies = [
+ "autocfg",
 ]
 
 [[package]]
@@ -767,6 +785,7 @@ name = "tsp_colony"
 version = "0.1.0"
 dependencies = [
  "clap 4.2.4",
+ "iterator_ilp",
  "mpi",
  "rand",
  "serde",

@@ -29,8 +29,6 @@ impl Index<(usize, usize)> for DistanceMatrix {
     type Output = DistanceT;
 
     fn index(&self, (x, y): (usize, usize)) -> &Self::Output {
-        debug_assert!(x > y);
-
         &self.0[(x, y)]
     }
 }

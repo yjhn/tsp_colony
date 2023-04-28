@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use rand::{distributions::Uniform, prelude::Distribution, seq::SliceRandom, Rng, SeedableRng};
 
 use crate::{
@@ -8,11 +10,13 @@ use crate::{
     tour::{CityIndex, Length, Tour},
     utils::{all_cities, all_cities_fill, order, reverse_order},
 };
+use iterator_ilp::IteratorILP;
 
 pub struct Ant {
     // TODO: maybe use one vec for both visited and unvisited cities.
     // Unvisited cities would be at the front, and the tour would grow from the back
     // or vice-versa.
+    // Both tour and unvisited_cities have fixed capacity once the ant is created.
     unvisited_cities: Vec<CityIndex>,
     tour: Vec<CityIndex>,
     // It would be cleaner to use Option<u32> here, but then it would have
@@ -68,8 +72,9 @@ impl Ant {
 
     /// Calculates and caches tour length.
     pub fn tour_length(&mut self, distances: &DistanceMatrix) -> u32 {
+        // dbg!(self.tour.len());
         if self.tour_length == u32::MAX {
-            self.tour_length = self.tour.calculate_tour_length(distances)
+            self.tour_length = self.tour.calculate_tour_length(distances);
         }
         self.tour_length
     }
@@ -82,9 +87,10 @@ impl Ant {
             .copied()
             .map(|city| {
                 let ord = order(city, self.current_city);
-                matrix.pheromone(ord).powf(alpha) * matrix.visibility(ord)
+                matrix.pheromone((ord.1, ord.0)).powf(alpha) * matrix.visibility(ord)
             })
             .sum()
+        // .sum_ilp::<8, _>()
     }
 
     pub fn choose_next_city<R: Rng + SeedableRng>(
@@ -95,21 +101,27 @@ impl Ant {
     ) {
         self.unvisited_cities.shuffle(rng);
         // TODO: 4 formulė straipsnyje
-        let divisor = self.sum_tau(matrix, alpha);
+        let denominator = self.sum_tau(matrix, alpha);
         // TODO: gal pasidaryti ir čia uniform distribution? Bet neaišku, kiek kartų bus naudojama...
         let distrib = Uniform::new(0.0, 1.0).unwrap();
 
         for idx in 0..self.unvisited_cities.len() {
             let city = self.unvisited_cities[idx];
             let ord = order(city, self.current_city);
-            let dividend = matrix.pheromone(ord).powf(alpha) * matrix.visibility(ord);
-            let p = dividend / divisor;
+            let numerator = matrix.pheromone((ord.1, ord.0)).powf(alpha) * matrix.visibility(ord);
+            let p = numerator / denominator;
             if p > distrib.sample(rng) {
                 // This city is the chosen one.
                 self.visit_city(city, idx);
                 return;
             }
         }
+        // We have to choose a city in this function, so choose the first
+        // in unvisited if the loop fails to select any.
+        // Taken from:
+        // https://github.com/ppoffice/ant-colony-tsp/blob/d4e6dfb880728fe2de8ac59b723879b0e662ad0c/aco.py#L96-L107
+        // TODO: find a better solution.
+        self.visit_city(self.unvisited_cities[0], 0);
     }
 
     /// Clones the ant's tour.

@@ -32,7 +32,7 @@ impl PheromoneVisibilityMatrix {
             for x in 0..y {
                 // We will use beta to raise the d_ij, not 1/d_ij,
                 // so it must be negative to get the same results.
-                matrix[(x, y)] = (distances[(x, y)] as Float).powf(-beta);
+                matrix[(x, y)] = (1.0 / distances[(y, x)] as Float).powf(beta);
             }
         }
         PheromoneVisibilityMatrix { matrix, ro }
@@ -60,6 +60,19 @@ impl PheromoneVisibilityMatrix {
         debug_assert!(x > y);
 
         self.matrix[(x.get(), y.get())] += delta_tau;
+    }
+
+    pub fn set_ro(&mut self, ro: Float) {
+        self.ro = ro;
+    }
+
+    // Resets all pheromone levels to `value`
+    pub fn reset_pheromone(&mut self, value: Float) {
+        for x in 0..self.matrix.side_length() {
+            for y in 0..x {
+                self.matrix[(x, y)] = value;
+            }
+        }
     }
 
     pub fn evaporate_pheromone(&mut self) {

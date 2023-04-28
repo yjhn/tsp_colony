@@ -199,8 +199,8 @@ impl Length for [CityIndex] {
         assert!(self.len() > 1);
 
         let mut tour_length = 0;
-        for idx in 1..self.len() {
-            tour_length += distances[(self[idx - 1].get(), self[idx].get())];
+        for idx in 0..(self.len() - 1) {
+            tour_length += distances[(self[idx], self[idx + 1])];
         }
         // Add distance from last to first.
         tour_length += distances[(self.last().unwrap().get(), self[0].get())];
