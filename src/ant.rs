@@ -1,12 +1,9 @@
-use std::time::Instant;
-
 use rand::{distributions::Uniform, prelude::Distribution, seq::SliceRandom, Rng, SeedableRng};
 
 use crate::{
     config::Float,
     distance_matrix::DistanceMatrix,
-    matrix::SquareMatrix,
-    pheromone_visibility_matrix::{self, PheromoneVisibilityMatrix},
+    pheromone_visibility_matrix::PheromoneVisibilityMatrix,
     tour::{CityIndex, Length, Tour},
     utils::{all_cities, all_cities_fill, order, reverse_order},
 };
@@ -97,6 +94,7 @@ impl Ant {
     pub fn choose_next_city<R: Rng + SeedableRng>(
         &mut self,
         rng: &mut R,
+        distrib: &Uniform<Float>,
         matrix: &PheromoneVisibilityMatrix,
         alpha: Float,
     ) {
@@ -117,9 +115,6 @@ impl Ant {
         // } else {
         //     Float::MIN_POSITIVE
         // };
-        // TODO: gal pasidaryti ir čia uniform distribution? Bet neaišku, kiek kartų bus naudojama...
-        // TODO: construct distribution only once, pass it by ref instead of RNG
-        let distrib = Uniform::new(0.0, 1.0).unwrap();
 
         let mut max_prob_city_idx = 0;
         let mut max_prob = -1.0;

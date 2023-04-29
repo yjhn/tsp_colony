@@ -1,12 +1,8 @@
-use std::ops::Index;
-
 use crate::{
     config::{self, Float},
     distance_matrix::DistanceMatrix,
     matrix::SquareMatrix,
     tour::CityIndex,
-    tour::Tour,
-    utils::order,
 };
 
 /// Upper right triangle: pheromone level.

@@ -24,7 +24,7 @@ use mpi::{
 };
 
 // Run using:
-// cargo build --release && RUST_BACKTRACE=1 mpirun -c 2 --use-hwthread-cpus --mca opal_warn_on_missing_libcuda 0 target/release/salesman -f data/att532.tsp -b 5 -a Cga --benchmark -m 100000 --bench-results-dir cga_100000_gens -e 4 --skip-duplicates
+// cargo build --release && RUST_BACKTRACE=1 mpirun -c 1 --use-hwthread-cpus --mca opal_warn_on_missing_libcuda 0 target/release/tsp_colony --dup switch-name --alphas 1 --betas 5 --ros 0.5 --qs 100 -f data/eil101.tsp 1>/dev/null
 fn main() {
     let args = arguments::Args::parse();
     eprintln!("Supplied arguments: {args:#?}");

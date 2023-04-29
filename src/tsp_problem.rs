@@ -5,12 +5,10 @@ use std::str::FromStr;
 use tspf::WeightKind;
 use tspf::{Tsp, TspBuilder};
 
-use rand::rngs::SmallRng;
 use rand::Rng;
 use rand::SeedableRng;
 
 use crate::distance_matrix::DistanceMatrix;
-use crate::matrix::SquareMatrix;
 use crate::tour::CityIndex;
 use crate::tsplib::TspLibProblems;
 

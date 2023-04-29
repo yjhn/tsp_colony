@@ -7,7 +7,6 @@ use mpi::topology::{Process, SystemCommunicator};
 use mpi::traits::{Communicator, Root};
 use rand::{Rng, SeedableRng};
 use serde::Serialize;
-use strum::IntoStaticStr;
 
 use crate::ant_cycle::AntCycle;
 use crate::arguments::{DuplicateHandling, PopulationSizes};
@@ -28,6 +27,7 @@ struct AntCycleConstants {
 
 #[derive(Serialize)]
 struct RunResult {
+    run_number: u32,
     found_optimal_tour: bool,
     shortest_found_tour: u32,
     iteration_reached: u32,
@@ -177,7 +177,8 @@ pub fn benchmark_ant_cycle<PD, R>(
                                     );
                                 }
 
-                                for run_number in 0..repeat_times {
+                                // for run_number in 0..repeat_times {
+                                for run_number in 0.. {
                                     let run_start = Instant::now();
 
                                     // todo!("Benchmark logic goes here");
@@ -187,6 +188,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                                     if is_root {
                                         let run_duration = run_start.elapsed();
                                         let result = RunResult {
+                                            run_number,
                                             found_optimal_tour,
                                             shortest_found_tour: ant_cycle.best_tour().length(),
                                             iteration_reached: ant_cycle.iteration(),
@@ -200,6 +202,9 @@ pub fn benchmark_ant_cycle<PD, R>(
                                         );
 
                                         run_results.push(result);
+                                    }
+                                    if found_optimal_tour {
+                                        break;
                                     }
                                     ant_cycle.reset_all_state();
                                 }

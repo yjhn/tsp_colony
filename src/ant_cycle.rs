@@ -5,7 +5,6 @@ use rand::{distributions, prelude::Distribution, Rng, SeedableRng};
 use crate::{
     ant::Ant,
     config::Float,
-    matrix::SquareMatrix,
     pheromone_visibility_matrix::PheromoneVisibilityMatrix,
     tour::{CityIndex, Tour},
     tsp_problem::TspProblem,
@@ -107,6 +106,7 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
     pub fn iterate_until_optimal(&mut self, max_iterations: u32) -> bool {
         let num_cities = self.tsp_problem.number_of_cities();
         let mut distrib = distributions::Uniform::new(0, num_cities).unwrap();
+        let distrib01 = distributions::Uniform::new(0.0, 1.0).unwrap();
 
         struct ShortestIterationTour {
             ant_idx: usize,
@@ -129,7 +129,7 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             let mut stale = true;
             for (idx, ant) in self.ants.iter_mut().enumerate() {
                 for _ in 1..num_cities {
-                    ant.choose_next_city(self.rng, &self.pheromone_matrix, self.alpha);
+                    ant.choose_next_city(self.rng, &distrib01, &self.pheromone_matrix, self.alpha);
                 }
 
                 let len = ant.tour_length(self.tsp_problem.distances());

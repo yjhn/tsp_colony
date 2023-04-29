@@ -1,4 +1,7 @@
-use rand::rngs::SmallRng;
+use rand::{
+    rngs::{SmallRng, StdRng},
+    CryptoRng,
+};
 
 /// Float type to use everywhere (pheromone and quantities).
 pub type Float = f32;
@@ -16,11 +19,11 @@ pub const Q: Float = 100.0;
 pub const POPULATION_SIZES: [u32; 4] = [16, 32, 64, 128];
 pub const MAX_ITERATIONS: u32 = 5000;
 // Initial intensity of all trails.
-pub const INITIAL_TRAIL_INTENSITY: Float = 10.0;
+pub const INITIAL_TRAIL_INTENSITY: Float = 10000000.0;
 
 // Benchmark repeat times.
 pub const REPEAT_TIMES: u32 = 10;
 // Benchmark results directory.
 pub const RESULTS_DIR: &str = "results";
 
-pub type RNG = SmallRng;
+pub type RNG = StdRng;

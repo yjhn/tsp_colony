@@ -1,6 +1,6 @@
-use std::ops::{Index, IndexMut};
+use std::ops::Index;
 
-use crate::{config, matrix::SquareMatrix, tour::CityIndex, tour::Tour, utils::order};
+use crate::{matrix::SquareMatrix, tour::CityIndex};
 
 type DistanceT = u32;
 
