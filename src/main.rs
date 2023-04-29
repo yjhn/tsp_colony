@@ -13,7 +13,10 @@ mod tsp_problem;
 mod tsplib;
 mod utils;
 
-use crate::{arguments::Args, benchmark::benchmark_ant_cycle};
+use crate::{
+    arguments::{Args, PopulationSizes},
+    benchmark::benchmark_ant_cycle,
+};
 use clap::Parser;
 use mpi::{
     topology::{Process, SystemCommunicator},
@@ -23,29 +26,23 @@ use mpi::{
 // Run using:
 // cargo build --release && RUST_BACKTRACE=1 mpirun -c 2 --use-hwthread-cpus --mca opal_warn_on_missing_libcuda 0 target/release/salesman -f data/att532.tsp -b 5 -a Cga --benchmark -m 100000 --bench-results-dir cga_100000_gens -e 4 --skip-duplicates
 fn main() {
-    let mut args = arguments::Args::parse();
+    let args = arguments::Args::parse();
     eprintln!("Supplied arguments: {args:#?}");
 
-    if args.alphas.is_empty() {
-        args.alphas = vec![config::ALPHA];
-    }
-    if args.betas.is_empty() {
-        args.betas = vec![config::BETA];
-    }
-    if args.ros.is_empty() {
-        args.ros = vec![config::RO];
-    }
-    if args.qs.is_empty() {
-        args.qs = vec![config::Q];
-    }
-    if args.init_intensities.is_empty() {
-        args.init_intensities = vec![config::INITIAL_TRAIL_INTENSITY];
-    }
-    if args.population_sizes.is_empty() {
-        args.population_sizes = config::POPULATION_SIZES.to_vec();
-    }
+    let alphas = args.alphas.unwrap_or_else(|| vec![config::ALPHA]);
+    let betas = args.betas.unwrap_or_else(|| vec![config::BETA]);
+    let ros = args.ros.unwrap_or_else(|| vec![config::RO]);
 
-    eprintln!("Corrected arguments: {args:#?}");
+    let qs = args.qs.unwrap_or_else(|| vec![config::Q]);
+    let init_intensities = args
+        .init_intensities
+        .unwrap_or_else(|| vec![config::INITIAL_TRAIL_INTENSITY]);
+
+    let population_sizes = if let Some(popsizes) = args.population_sizes {
+        PopulationSizes::Custom(popsizes)
+    } else {
+        PopulationSizes::SameAsCityCount
+    };
 
     // Initialize stuff.
     const MPI_ROOT_RANK: i32 = 0;
@@ -64,14 +61,14 @@ fn main() {
         rank,
         is_root,
         args.bench_repeat_times,
-        &args.population_sizes,
+        population_sizes,
         args.max_iterations,
         args.dup,
         &args.bench_results_dir,
-        &args.alphas,
-        &args.betas,
-        &args.qs,
-        &args.ros,
-        &args.init_intensities,
+        &alphas,
+        &betas,
+        &qs,
+        &ros,
+        &init_intensities,
     );
 }

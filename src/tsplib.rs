@@ -2,6 +2,7 @@
 
 use strum::{EnumString, IntoStaticStr};
 
+/// Enumerator is problem name, its discriminant - solution length.
 #[derive(EnumString, IntoStaticStr)]
 #[repr(u32)]
 pub enum TspLibProblems {

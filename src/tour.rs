@@ -24,6 +24,12 @@ impl CityIndex {
     }
 }
 
+impl Display for CityIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CityIndex({})", self.0)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Tour {
     cities: Vec<CityIndex>,
@@ -180,7 +186,9 @@ impl Tour {
 
     /// Creates a new `Tour` by cloning the provided slice. Trusts that the `length`
     /// is correct.
-    pub fn clone_from_cities(tour: &[CityIndex], length: u32) -> Tour {
+    pub fn clone_from_cities(tour: &[CityIndex], length: u32, distances: &DistanceMatrix) -> Tour {
+        debug_assert_eq!(length, tour.calculate_tour_length(distances));
+
         Tour {
             cities: tour.to_owned(),
             tour_length: length,

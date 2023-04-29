@@ -12,7 +12,7 @@ pub enum DuplicateHandling {
     SwitchName,
     /// Overwrite old file.
     Overwrite,
-    /// Append to old file.
+    /// Append to old file. This should not be used, as JSON cannot have two roots.
     Append,
 }
 
@@ -22,20 +22,20 @@ pub struct Args {
     /// TSP problem definition files.
     pub files: Vec<String>,
 
-    #[arg(long, required = false, num_args(1..))]
-    pub alphas: Vec<Float>,
+    #[arg(long, num_args(1..))]
+    pub alphas: Option<Vec<Float>>,
 
-    #[arg(long, required = false, num_args(1..))]
-    pub betas: Vec<Float>,
+    #[arg(long, num_args(1..))]
+    pub betas: Option<Vec<Float>>,
 
-    #[arg(long, required = false, num_args(1..))]
-    pub ros: Vec<Float>,
+    #[arg(long, num_args(1..))]
+    pub ros: Option<Vec<Float>>,
 
-    #[arg(long, required = false, num_args(1..))]
-    pub qs: Vec<Float>,
+    #[arg(long, num_args(1..))]
+    pub qs: Option<Vec<Float>>,
 
-    #[arg(long, required = false, num_args(1..))]
-    pub init_intensities: Vec<Float>,
+    #[arg(long, num_args(1..))]
+    pub init_intensities: Option<Vec<Float>>,
 
     #[arg(short, long, default_value_t = config::MAX_ITERATIONS)]
     /// Maximum number of generations for obtaining the optimal solution.
@@ -48,10 +48,17 @@ pub struct Args {
     #[arg(long, required = false, default_value_t = config::RESULTS_DIR.to_owned())]
     pub bench_results_dir: String,
 
-    #[arg(short, long, required = false, num_args(1..))]
-    pub population_sizes: Vec<u32>,
+    #[arg(short, long, num_args(1..))]
+    /// Ant population sizes. If not specified, defaults to city count.
+    pub population_sizes: Option<Vec<u32>>,
 
     #[arg(value_enum, long, required = false, default_value_t = DuplicateHandling::Panic)]
     /// What to do if existing benchmark results files are found.
     pub dup: DuplicateHandling,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum PopulationSizes {
+    SameAsCityCount,
+    Custom(Vec<u32>),
 }

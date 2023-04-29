@@ -57,7 +57,7 @@ impl PheromoneVisibilityMatrix {
     }
 
     pub fn adjust_pheromone(&mut self, (x, y): (CityIndex, CityIndex), delta_tau: Float) {
-        debug_assert!(x > y);
+        debug_assert!(x > y, "x: {x}, y: {y}");
 
         self.matrix[(x.get(), y.get())] += delta_tau;
     }

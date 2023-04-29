@@ -90,11 +90,11 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         self.pheromone_matrix.reset_pheromone(intensity);
     }
 
-    fn reset_all_state(&mut self) {
+    pub fn reset_all_state(&mut self) {
         // Reset ants.
+        let num_cities = self.tsp_problem.number_of_cities();
+        let mut distrib = distributions::Uniform::new(0, num_cities).unwrap();
         for a in self.ants.iter_mut() {
-            let num_cities = self.tsp_problem.number_of_cities();
-            let mut distrib = distributions::Uniform::new(0, num_cities).unwrap();
             a.reset_to_city(num_cities, CityIndex::new(distrib.sample(&mut self.rng)));
         }
         self.time = 0;
@@ -115,9 +115,7 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         let mut found_optimal = false;
 
         loop {
-            dbg!(self.iteration);
-            dbg!(self.best_tour.length());
-            let t = Instant::now();
+            // let t = Instant::now();
             // TODO: gal precomputint pheromone.powf(alpha)? Vis tiek jis keičiasi tik tik kitoje iteracijoje.
             // Each ant constructs a tour, keep track of the shortest tour found in this iteration.
             let mut short = ShortestIterationTour {
@@ -155,8 +153,12 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
 
             // Keep track of the shortest tour.
             if short.tour_length < self.best_tour.length() {
-                self.best_tour = self.ants[short.ant_idx].clone_tour();
+                self.best_tour = self.ants[short.ant_idx].clone_tour(self.tsp_problem.distances());
+                dbg!(self.iteration, self.best_tour.length());
             }
+
+            self.iteration += 1;
+            self.time += num_cities;
 
             if self.iteration == max_iterations {
                 println!("Stopping, reached max iterations count");
@@ -178,21 +180,13 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
                 break;
             }
 
-            self.iteration += 1;
-            self.time += num_cities;
-
             // Reset ants.
             for a in self.ants.iter_mut() {
                 a.reset_to_city(num_cities, CityIndex::new(distrib.sample(&mut self.rng)));
             }
 
-            dbg!(t.elapsed().as_nanos());
+            // dbg!(t.elapsed().as_nanos());
         }
-        // Reset ants.
-        for a in self.ants.iter_mut() {
-            a.reset_to_city(num_cities, CityIndex::new(distrib.sample(&mut self.rng)));
-        }
-        self.reset_all_state();
 
         found_optimal
     }

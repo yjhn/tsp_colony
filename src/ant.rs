@@ -79,7 +79,7 @@ impl Ant {
         self.tour_length
     }
 
-    // Sums pheromone levels raised to alpha * distances raised to beta
+    // Sums pheromone levels raised to alpha * visibilities
     // for all unvisited cities (divisor in formula 4 in the paper).
     pub fn sum_tau(&self, matrix: &PheromoneVisibilityMatrix, alpha: Float) -> Float {
         self.unvisited_cities
@@ -87,7 +87,8 @@ impl Ant {
             .copied()
             .map(|city| {
                 let ord = order(city, self.current_city);
-                matrix.pheromone((ord.1, ord.0)).powf(alpha) * matrix.visibility(ord)
+                // matrix.pheromone((ord.1, ord.0)).powf(alpha) * matrix.visibility(ord)
+                matrix.pheromone((ord.1, ord.0)) * matrix.visibility(ord)
             })
             .sum()
         // .sum_ilp::<8, _>()
@@ -99,36 +100,61 @@ impl Ant {
         matrix: &PheromoneVisibilityMatrix,
         alpha: Float,
     ) {
+        debug_assert!(!self.unvisited_cities.is_empty());
+
         self.unvisited_cities.shuffle(rng);
         // TODO: 4 formulė straipsnyje
         let denominator = self.sum_tau(matrix, alpha);
+        // debug_assert!(denominator > 0.0, "denominator: {denominator}");
+        if denominator <= 0.0 {
+            // If denominator is 0, all paths pheromone is 0,
+            // so choose any city.
+            self.visit_city(self.unvisited_cities[0], 0);
+            return;
+        }
+        // let denominator = if denominator > 0.0 {
+        //     denominator
+        // } else {
+        //     Float::MIN_POSITIVE
+        // };
         // TODO: gal pasidaryti ir čia uniform distribution? Bet neaišku, kiek kartų bus naudojama...
+        // TODO: construct distribution only once, pass it by ref instead of RNG
         let distrib = Uniform::new(0.0, 1.0).unwrap();
 
+        let mut max_prob_city_idx = 0;
+        let mut max_prob = -1.0;
+        let mut max_prob_city = CityIndex::new(0);
         for idx in 0..self.unvisited_cities.len() {
             let city = self.unvisited_cities[idx];
             let ord = order(city, self.current_city);
-            let numerator = matrix.pheromone((ord.1, ord.0)).powf(alpha) * matrix.visibility(ord);
+            // let numerator = matrix.pheromone((ord.1, ord.0)).powf(alpha) * matrix.visibility(ord);
+            let numerator = matrix.pheromone((ord.1, ord.0)) * matrix.visibility(ord);
             let p = numerator / denominator;
             if p > distrib.sample(rng) {
                 // This city is the chosen one.
                 self.visit_city(city, idx);
                 return;
+            } else if p > max_prob {
+                max_prob = p;
+                max_prob_city_idx = idx;
+                max_prob_city = city;
             }
         }
+        debug_assert!(max_prob >= 0.0, "max_prob: {max_prob}");
         // We have to choose a city in this function, so choose the first
         // in unvisited if the loop fails to select any.
         // Taken from:
         // https://github.com/ppoffice/ant-colony-tsp/blob/d4e6dfb880728fe2de8ac59b723879b0e662ad0c/aco.py#L96-L107
         // TODO: find a better solution.
-        self.visit_city(self.unvisited_cities[0], 0);
+        // self.visit_city(self.unvisited_cities[0], 0);
+        self.visit_city(max_prob_city, max_prob_city_idx);
     }
 
     /// Clones the ant's tour.
-    pub fn clone_tour(&self) -> crate::tour::Tour {
+    pub fn clone_tour(&self, distances: &DistanceMatrix) -> crate::tour::Tour {
         // Length must be already calculated.
         debug_assert!(self.tour_length != u32::MAX);
 
-        Tour::clone_from_cities(&self.tour, self.tour_length)
+        Tour::clone_from_cities(&self.tour, self.tour_length, distances)
     }
 }

@@ -10,7 +10,7 @@ use serde::Serialize;
 use strum::IntoStaticStr;
 
 use crate::ant_cycle::AntCycle;
-use crate::arguments::DuplicateHandling;
+use crate::arguments::{DuplicateHandling, PopulationSizes};
 use crate::config::Float;
 use crate::tsp_problem::TspProblem;
 use crate::utils::initialize_random_seed;
@@ -66,7 +66,7 @@ pub fn benchmark_ant_cycle<PD, R>(
     rank: i32,
     is_root: bool,
     repeat_times: u32,
-    population_sizes: &[u32],
+    population_sizes: PopulationSizes,
     max_iterations: u32,
     duplicate_handling: DuplicateHandling,
     results_dir: &str,
@@ -97,7 +97,11 @@ pub fn benchmark_ant_cycle<PD, R>(
             eprintln!("Problem file name: {path}");
         }
         let problem = TspProblem::from_file(path);
-        for &p in population_sizes {
+        let population_sizes = match population_sizes {
+            PopulationSizes::SameAsCityCount => vec![problem.number_of_cities() as u32],
+            PopulationSizes::Custom(ref sizes) => sizes.clone(),
+        };
+        for &p in population_sizes.iter() {
             for &beta in betas {
                 // Construct the solver here, as nothing meaningfull will change in
                 // the inner loops.
@@ -197,6 +201,7 @@ pub fn benchmark_ant_cycle<PD, R>(
 
                                         run_results.push(result);
                                     }
+                                    ant_cycle.reset_all_state();
                                 }
 
                                 let bench_duration = bench_start.elapsed();

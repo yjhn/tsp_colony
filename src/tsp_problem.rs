@@ -41,6 +41,13 @@ impl TspProblem {
 
     pub fn from_file(path: impl AsRef<Path>) -> TspProblem {
         let tsp = TspBuilder::parse_path(path).unwrap();
+        let name = tsp.name().to_owned();
+        // a280 has two identical cities (171 and 172), so it needs special treatment.
+        // For simplicity, disallow it.
+        assert_ne!(
+            name, "a280",
+            "a280 has two identical cities, this can cause problems"
+        );
         let number_of_cities = tsp.dim();
         let cities = {
             let coord_map = tsp.node_coords();
@@ -59,7 +66,6 @@ impl TspProblem {
 
         let distances = Self::calculate_distances(number_of_cities, &tsp);
 
-        let name = tsp.name().to_owned();
         let solution_length = TspLibProblems::from_str(name.as_str()).unwrap() as u32;
 
         TspProblem {
@@ -93,13 +99,13 @@ impl TspProblem {
         for ind1 in 1..=city_count {
             for ind2 in (ind1 + 1)..=city_count {
                 let dist_f64 = tsp.weight(ind1, ind2);
-                // TSPLIB problem a280 has two identical cities, ignore this case.
+                // TSPLIB problem a280 has two identical cities (171 and 172), ignore this case.
                 if tsp.name() != "a280" {
                     // tsp.weight() returns 0.0 on error.
                     assert!(
-                    dist_f64 > 0.0,
-                    "Error calculating distance, tsp.weight({ind1}, {ind2}) returned {dist_f64}"
-                );
+                        dist_f64 > 0.0,
+                        "Error calculating distance, tsp.weight({ind1}, {ind2}) returned {dist_f64}"
+                    );
                 }
                 // tsp.weight() returns unrounded distances. Distances are defined
                 // to be u32 in TSPLIB95 format, and rounding depends on edge weight type.
