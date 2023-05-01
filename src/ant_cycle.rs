@@ -1,13 +1,16 @@
-use std::time::Instant;
+use std::{cmp::max, time::Instant};
 
+use mpi::traits::CommunicatorCollectives;
 use rand::{distributions, prelude::Distribution, Rng, SeedableRng};
 
 use crate::{
     ant::Ant,
     config::Float,
+    matrix::SquareMatrix,
     pheromone_visibility_matrix::PheromoneVisibilityMatrix,
     tour::{CityIndex, Tour},
     tsp_problem::TspProblem,
+    utils::Mpi,
 };
 
 /// Runs the ant cycle algorithm.
@@ -23,8 +26,9 @@ pub struct AntCycle<'a, R: Rng + SeedableRng> {
     pheromone_matrix: PheromoneVisibilityMatrix,
     tsp_problem: &'a TspProblem,
     alpha: Float,
-    q: Float,
+    capital_q_mul: Float,
     initial_trail_intensity: Float,
+    mpi: &'a Mpi<'a>,
 }
 
 impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
@@ -35,8 +39,9 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         initial_trail_intensity: Float,
         alpha: Float,
         beta: Float,
-        q: Float,
+        capital_q_mul: Float,
         ro: Float,
+        mpi: &'a Mpi,
     ) -> AntCycle<'a, R> {
         let city_count = tsp_problem.number_of_cities();
         let pheromone_matrix = PheromoneVisibilityMatrix::new(
@@ -67,8 +72,9 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             pheromone_matrix,
             tsp_problem,
             alpha,
-            q,
+            capital_q_mul,
             initial_trail_intensity,
+            mpi,
         }
     }
 
@@ -76,8 +82,8 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         self.alpha = alpha;
     }
 
-    pub fn set_q(&mut self, q: Float) {
-        self.q = q;
+    pub fn set_capital_q_mul(&mut self, q: Float) {
+        self.capital_q_mul = q;
     }
 
     pub fn set_ro(&mut self, ro: Float) {
@@ -113,15 +119,18 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             tour_length: u32,
         }
         let mut found_optimal = false;
+        let mut delta_tau_matrix = SquareMatrix::new(num_cities, 0.0);
 
         loop {
             // let t = Instant::now();
-            // TODO: gal precomputint pheromone.powf(alpha)? Vis tiek jis keičiasi tik tik kitoje iteracijoje.
+            // TODO: gal precomputint pheromone.powf(alpha)? Vis tiek jis keičiasi tik kitoje iteracijoje.
             // Each ant constructs a tour, keep track of the shortest tour found in this iteration.
             let mut short = ShortestIterationTour {
                 ant_idx: 0,
                 tour_length: u32::MAX,
             };
+            // Also keep track of the longest tour to calculate Q.
+            let mut longest_tour_length = 0;
 
             // Colony is stale if all ants find the same tour. Since actually
             // checking if tours match is expensive, we only check if they are
@@ -143,14 +152,33 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
                 } else if len > short.tour_length {
                     stale = false;
                 }
+                if len > longest_tour_length {
+                    longest_tour_length = len;
+                }
             }
 
             // Update pheromone.
             self.pheromone_matrix.evaporate_pheromone();
+
+            let capital_q = self.capital_q_mul * longest_tour_length as Float;
+            // TODO: figure out if this should be calculated using best length so far or only from this iteration.
+            let min_tau = capital_q / short.tour_length as f32;
+
             for ant in self.ants.iter() {
-                ant.update_pheromone(&mut self.pheromone_matrix, self.q);
+                ant.update_pheromone(&mut delta_tau_matrix, self.capital_q_mul);
             }
 
+            for x in 0..num_cities {
+                for y in 0..x {
+                    let delta = delta_tau_matrix[(x, y)];
+                    self.pheromone_matrix.adjust_pheromone(
+                        (CityIndex::new(x), CityIndex::new(y)),
+                        if delta > min_tau { delta } else { min_tau },
+                    );
+                }
+            }
+
+            delta_tau_matrix.fill(0.0);
             // Keep track of the shortest tour.
             if short.tour_length < self.best_tour.length() {
                 self.best_tour = self.ants[short.ant_idx].clone_tour(self.tsp_problem.distances());
@@ -159,6 +187,16 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
 
             self.iteration += 1;
             self.time += num_cities;
+
+            // TODO: use all_gather_into for actual information exchange:
+            // first, all processors exchange info on the routes of their best routes so far
+            // then, each processor chooses with which processor to exchange info and does it
+            let send_buf = [self.mpi.rank];
+            let mut recv_buf = vec![0; self.mpi.world_size as usize];
+            self.mpi.world.all_gather_into(&send_buf, &mut recv_buf);
+            if self.mpi.is_root {
+                dbg!(recv_buf);
+            }
 
             if self.iteration == max_iterations {
                 println!("Stopping, reached max iterations count");

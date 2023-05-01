@@ -32,7 +32,9 @@ pub struct Args {
     pub ros: Option<Vec<Float>>,
 
     #[arg(long, num_args(1..))]
-    pub qs: Option<Vec<Float>>,
+    /// Multipliers for Q, which is related to the quantity of trail laid by ants.
+    /// Q is calculated as capital_q_mul * <largest length of the solutions in an iteration>
+    pub capital_q_muls: Option<Vec<Float>>,
 
     #[arg(long, num_args(1..))]
     pub init_intensities: Option<Vec<Float>>,

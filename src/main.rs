@@ -16,6 +16,7 @@ mod utils;
 use crate::{
     arguments::{Args, PopulationSizes},
     benchmark::benchmark_ant_cycle,
+    utils::Mpi,
 };
 use clap::Parser;
 use mpi::{
@@ -33,7 +34,9 @@ fn main() {
     let betas = args.betas.unwrap_or_else(|| vec![config::BETA]);
     let ros = args.ros.unwrap_or_else(|| vec![config::RO]);
 
-    let qs = args.qs.unwrap_or_else(|| vec![config::Q]);
+    let capital_q_muls = args
+        .capital_q_muls
+        .unwrap_or_else(|| vec![config::CAPITAL_Q_MULTIPLIER]);
     let init_intensities = args
         .init_intensities
         .unwrap_or_else(|| vec![config::INITIAL_TRAIL_INTENSITY]);
@@ -44,22 +47,25 @@ fn main() {
         PopulationSizes::SameAsCityCount
     };
 
-    // Initialize stuff.
+    // Initialize MPI.
     const MPI_ROOT_RANK: i32 = 0;
     let universe = mpi::initialize().unwrap();
     let world = universe.world();
-    let size = world.size();
+    let world_size = world.size();
     let rank = world.rank();
     let root_process = world.process_at_rank(MPI_ROOT_RANK);
     let is_root = rank == MPI_ROOT_RANK;
-
-    // TODO: bencmarking
-    benchmark_ant_cycle::<_, config::RNG>(
-        &args.files,
+    let mpi = Mpi {
+        universe,
         world,
+        world_size,
         root_process,
         rank,
-        is_root,
+        is_root: rank == MPI_ROOT_RANK,
+    };
+
+    benchmark_ant_cycle::<_, config::RNG>(
+        &args.files,
         args.bench_repeat_times,
         population_sizes,
         args.max_iterations,
@@ -67,8 +73,9 @@ fn main() {
         &args.bench_results_dir,
         &alphas,
         &betas,
-        &qs,
+        &capital_q_muls,
         &ros,
         &init_intensities,
+        &mpi,
     );
 }

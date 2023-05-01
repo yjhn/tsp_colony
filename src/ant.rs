@@ -3,6 +3,7 @@ use rand::{distributions::Uniform, prelude::Distribution, seq::SliceRandom, Rng,
 use crate::{
     config::Float,
     distance_matrix::DistanceMatrix,
+    matrix::SquareMatrix,
     pheromone_visibility_matrix::PheromoneVisibilityMatrix,
     tour::{CityIndex, Length, Tour},
     utils::{all_cities, all_cities_fill, order, reverse_order},
@@ -51,20 +52,18 @@ impl Ant {
         self.tour.push(city);
     }
 
-    pub fn update_pheromone(&self, pheromone_matrix: &mut PheromoneVisibilityMatrix, q: Float) {
+    pub fn update_pheromone(&self, delta_tau_matrix: &mut SquareMatrix<Float>, capital_q: Float) {
         debug_assert!(self.tour_length < u32::MAX);
 
-        let delta_tau = q / self.tour_length as Float;
+        // TODO: should Q/L_k be Q/L_l? (current implementation assumes it)
+        let delta_tau = capital_q / self.tour_length as Float;
         for path in self.tour.windows(2) {
-            if let &[c1, c2] = path {
-                pheromone_matrix.adjust_pheromone(reverse_order(c1, c2), delta_tau);
-            }
+            let &[c1, c2] = path else { unreachable!() };
+            delta_tau_matrix[reverse_order(c1.get(), c2.get())] += delta_tau;
         }
         // Last path.
-        pheromone_matrix.adjust_pheromone(
-            reverse_order(self.tour[0], *self.tour.last().unwrap()),
-            delta_tau,
-        );
+        delta_tau_matrix[reverse_order(self.tour[0].get(), self.tour.last().unwrap().get())] +=
+            delta_tau;
     }
 
     /// Calculates and caches tour length.
@@ -146,7 +145,7 @@ impl Ant {
     }
 
     /// Clones the ant's tour.
-    pub fn clone_tour(&self, distances: &DistanceMatrix) -> crate::tour::Tour {
+    pub fn clone_tour(&self, distances: &DistanceMatrix) -> Tour {
         // Length must be already calculated.
         debug_assert!(self.tour_length != u32::MAX);
 

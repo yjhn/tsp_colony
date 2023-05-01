@@ -21,6 +21,10 @@ where
     pub fn side_length(&self) -> usize {
         self.side_length
     }
+
+    pub fn fill(&mut self, value: T) {
+        self.data.fill(value);
+    }
 }
 
 impl<T> SquareMatrix<T>

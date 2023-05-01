@@ -1,7 +1,9 @@
 use crate::tour::CityIndex;
-use mpi::collective::Root;
-use mpi::topology::Process;
-use mpi::topology::SystemCommunicator;
+use mpi::environment::Universe;
+use mpi::{
+    topology::{Process, SystemCommunicator},
+    traits::{Communicator, Root},
+};
 
 // Returns (low, high).
 pub fn order<T: Ord>(a: T, b: T) -> (T, T) {
@@ -45,4 +47,13 @@ pub fn initialize_random_seed(
     let mut global_seed_buf = if is_root { [rand::random()] } else { [0] };
     root_process.broadcast_into(&mut global_seed_buf);
     global_seed_buf[0] + rank as u64
+}
+
+pub struct Mpi<'a> {
+    pub universe: Universe,
+    pub world: SystemCommunicator,
+    pub world_size: i32,
+    pub root_process: Process<'a, SystemCommunicator>,
+    pub rank: i32,
+    pub is_root: bool,
 }

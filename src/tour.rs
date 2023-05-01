@@ -1,6 +1,7 @@
 use crate::distance_matrix::DistanceMatrix;
 use crate::matrix::SquareMatrix;
 use crate::utils::all_cities;
+use crate::utils::order;
 use rand::prelude::SliceRandom;
 use rand::Rng;
 use std::fmt::Display;
@@ -100,6 +101,7 @@ impl Tour {
     pub fn remove_hack_length(&mut self) {
         self.cities.pop();
     }
+
     pub fn is_shorter_than(&self, other: &Tour) -> bool {
         self.tour_length < other.tour_length
     }
@@ -194,6 +196,33 @@ impl Tour {
             tour_length: length,
         }
     }
+
+    /// Returns the number of paths (edges) in one ant's tour that are not in other's.
+    /// Assumes that both ants have already fully constructed their tours.
+    pub fn distance(&self, other: &Tour) -> u32 {
+        debug_assert_eq!(self.number_of_cities(), other.number_of_cities());
+
+        // City count and path count is the same.
+        let num_cities = self.number_of_cities();
+        let mut common_edges = 0;
+        for pair in self.paths() {
+            let &[c1, c2] = pair else { unreachable!() };
+            common_edges += other.has_edge(c1, c2) as u32;
+        }
+        common_edges += other.has_edge(self.cities[0], *self.cities.last().unwrap()) as u32;
+
+        num_cities as u32 - common_edges
+    }
+
+    /// Returns true if the tour being constructed by this ant has in edge between `first`
+    /// and `second`. Order does not matter.
+    fn has_edge(&self, first: CityIndex, second: CityIndex) -> bool {
+        let inner_paths = self.paths().any(|pair| {
+            let &[c1, c2] = pair else { unreachable!() };
+            order(first, second) == order(c1, c2)
+        });
+        inner_paths || order(first, second) == order(self.cities[0], *self.cities.last().unwrap())
+    }
 }
 
 pub trait Length {
@@ -211,7 +240,7 @@ impl Length for [CityIndex] {
             tour_length += distances[(self[idx], self[idx + 1])];
         }
         // Add distance from last to first.
-        tour_length += distances[(self.last().unwrap().get(), self[0].get())];
+        tour_length += distances[(*self.last().unwrap(), self[0])];
 
         tour_length
     }

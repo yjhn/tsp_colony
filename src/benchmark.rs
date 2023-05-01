@@ -12,7 +12,7 @@ use crate::ant_cycle::AntCycle;
 use crate::arguments::{DuplicateHandling, PopulationSizes};
 use crate::config::Float;
 use crate::tsp_problem::TspProblem;
-use crate::utils::initialize_random_seed;
+use crate::utils::{initialize_random_seed, Mpi};
 
 #[derive(Serialize)]
 struct AntCycleConstants {
@@ -61,10 +61,6 @@ struct BenchmarkResults<'a, T: Serialize> {
 
 pub fn benchmark_ant_cycle<PD, R>(
     problem_paths: &[PD],
-    world: SystemCommunicator,
-    root_process: Process<SystemCommunicator>,
-    rank: i32,
-    is_root: bool,
     repeat_times: u32,
     population_sizes: PopulationSizes,
     max_iterations: u32,
@@ -75,25 +71,26 @@ pub fn benchmark_ant_cycle<PD, R>(
     qs: &[Float],
     ros: &[Float],
     init_intensities: &[Float],
+    mpi: &Mpi,
 ) where
     PD: AsRef<Path> + Display,
     R: Rng + SeedableRng,
 {
-    let process_count = world.size();
-    let random_seed = initialize_random_seed(root_process, rank, is_root);
+    let process_count = mpi.world_size;
+    let random_seed = initialize_random_seed(mpi.root_process, mpi.rank, mpi.is_root);
     let mut rng = R::seed_from_u64(random_seed);
 
-    if is_root {
+    if mpi.is_root {
         // Create benchmark results directory.
         if !Path::new(results_dir).exists() {
             fs::create_dir(results_dir).unwrap();
         }
 
-        eprintln!("MPI processes: {}", world.size());
+        eprintln!("MPI processes: {}", mpi.world_size);
     }
 
     for path in problem_paths {
-        if is_root {
+        if mpi.is_root {
             eprintln!("Problem file name: {path}");
         }
         let problem = TspProblem::from_file(path);
@@ -105,8 +102,9 @@ pub fn benchmark_ant_cycle<PD, R>(
             for &beta in betas {
                 // Construct the solver here, as nothing meaningfull will change in
                 // the inner loops.
-                let mut ant_cycle =
-                    AntCycle::new(p as usize, &mut rng, &problem, 0.0, 0.0, beta, 0.0, 0.0);
+                let mut ant_cycle = AntCycle::new(
+                    p as usize, &mut rng, &problem, 0.0, 0.0, beta, 0.0, 0.0, mpi,
+                );
 
                 for &intense in init_intensities {
                     ant_cycle.reset_pheromone(intense);
@@ -115,14 +113,14 @@ pub fn benchmark_ant_cycle<PD, R>(
                         ant_cycle.set_alpha(alpha);
 
                         for &q in qs {
-                            ant_cycle.set_q(q);
+                            ant_cycle.set_capital_q_mul(q);
 
                             for &ro in ros {
                                 ant_cycle.set_ro(ro);
 
                                 // Figure out where to save the results.
                                 let mut skip = [false];
-                                let save_file_path = if is_root {
+                                let save_file_path = if mpi.is_root {
                                     let mut save_file_path = format!(
                                         "{dir}/bm_{name}_{cpus}cpus_p{p}_q{q}_a{a}_b{b}_ro{r}_intensity{i}.json",
                                         dir=results_dir, name=problem.name(), cpus=process_count, p=p, q=q,
@@ -135,13 +133,13 @@ pub fn benchmark_ant_cycle<PD, R>(
                                     ) {
                                         BenchAction::Continue => (),
                                         BenchAction::SkipBench => skip[0] = true,
-                                        BenchAction::Abort => world.abort(1),
+                                        BenchAction::Abort => mpi.world.abort(1),
                                     };
                                     save_file_path
                                 } else {
                                     String::new()
                                 };
-                                root_process.broadcast_into(&mut skip);
+                                mpi.root_process.broadcast_into(&mut skip);
                                 if skip[0] {
                                     continue;
                                 }
@@ -170,22 +168,22 @@ pub fn benchmark_ant_cycle<PD, R>(
                                     repeat_times,
                                 };
 
-                                if is_root {
+                                if mpi.is_root {
                                     eprintln!(
                                         "{}",
                                         serde_json::to_string_pretty(&bench_config).unwrap()
                                     );
                                 }
 
-                                // for run_number in 0..repeat_times {
-                                for run_number in 0.. {
+                                for run_number in 0..repeat_times {
+                                    // for run_number in 0.. {
                                     let run_start = Instant::now();
 
                                     // todo!("Benchmark logic goes here");
                                     let found_optimal_tour =
                                         ant_cycle.iterate_until_optimal(max_iterations);
                                     // Needed returns: found_optimal, shortest_found (per getter), iteration_reached (galima paimti per getter)
-                                    if is_root {
+                                    if mpi.is_root {
                                         let run_duration = run_start.elapsed();
                                         let result = RunResult {
                                             run_number,
@@ -212,7 +210,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                                 let bench_duration = bench_start.elapsed();
 
                                 // Output results.
-                                if is_root {
+                                if mpi.is_root {
                                     let results = BenchmarkResults {
                                         bench_config,
                                         benchmark_start_time_millis: bench_start_absolute

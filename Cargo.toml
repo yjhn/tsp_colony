@@ -15,6 +15,8 @@ serde_json = "1"
 strum = { version = "0.24", features = ["derive"] }
 tspf = "0.3.1"
 
-[profile.release]
+# Do not alter the default release profile as it really kills compilation times.
+[profile.release-opt]
+inherits = "release"
 lto = true
 codegen-units = 1
