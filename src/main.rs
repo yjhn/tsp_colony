@@ -40,7 +40,9 @@ fn main() {
     let init_intensities = args
         .init_intensities
         .unwrap_or_else(|| vec![config::INITIAL_TRAIL_INTENSITY]);
-
+    let lowercase_qs = args
+        .lowercase_qs
+        .unwrap_or_else(|| vec![config::LOWERCASE_Q]);
     let population_sizes = if let Some(popsizes) = args.population_sizes {
         PopulationSizes::Custom(popsizes)
     } else {
@@ -75,6 +77,7 @@ fn main() {
         &betas,
         &capital_q_muls,
         &ros,
+        &lowercase_qs,
         &init_intensities,
         &mpi,
     );

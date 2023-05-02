@@ -12,7 +12,7 @@ pub enum DuplicateHandling {
     SwitchName,
     /// Overwrite old file.
     Overwrite,
-    /// Append to old file. This should not be used, as JSON cannot have two roots.
+    /// Append to old file. This should not be used, as JSON cannot have multiple roots.
     Append,
 }
 
@@ -38,6 +38,9 @@ pub struct Args {
 
     #[arg(long, num_args(1..))]
     pub init_intensities: Option<Vec<Float>>,
+
+    #[arg(long, num_args(1..))]
+    pub lowercase_qs: Option<Vec<u16>>,
 
     #[arg(short, long, default_value_t = config::MAX_ITERATIONS)]
     /// Maximum number of generations for obtaining the optimal solution.

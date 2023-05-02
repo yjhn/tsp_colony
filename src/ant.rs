@@ -5,7 +5,7 @@ use crate::{
     distance_matrix::DistanceMatrix,
     matrix::SquareMatrix,
     pheromone_visibility_matrix::PheromoneVisibilityMatrix,
-    tour::{CityIndex, Length, Tour},
+    tour::{CityIndex, Tour, TourFunctions},
     utils::{all_cities, all_cities_fill, order, reverse_order},
 };
 use iterator_ilp::IteratorILP;
@@ -25,9 +25,9 @@ pub struct Ant {
 }
 
 impl Ant {
-    pub fn new(city_count: usize, starting_city: CityIndex) -> Ant {
+    pub fn new(city_count: u16, starting_city: CityIndex) -> Ant {
         let mut unvisited_cities: Vec<CityIndex> = all_cities(city_count);
-        unvisited_cities.swap_remove(starting_city.get());
+        unvisited_cities.swap_remove(starting_city.into());
         let tour = vec![starting_city];
 
         Ant {
@@ -38,11 +38,11 @@ impl Ant {
         }
     }
 
-    pub fn reset_to_city(&mut self, city_count: usize, starting_city: CityIndex) {
+    pub fn reset_to_city(&mut self, city_count: u16, starting_city: CityIndex) {
         self.tour.clear();
         self.tour_length = u32::MAX;
         all_cities_fill(&mut self.unvisited_cities, city_count);
-        self.visit_city(starting_city, starting_city.get());
+        self.visit_city(starting_city, starting_city.into());
     }
 
     /// `idx` - index in unvisited cities `Vec`.
@@ -59,10 +59,10 @@ impl Ant {
         let delta_tau = capital_q / self.tour_length as Float;
         for path in self.tour.windows(2) {
             let &[c1, c2] = path else { unreachable!() };
-            delta_tau_matrix[reverse_order(c1.get(), c2.get())] += delta_tau;
+            delta_tau_matrix[reverse_order(c1.into(), c2.into())] += delta_tau;
         }
         // Last path.
-        delta_tau_matrix[reverse_order(self.tour[0].get(), self.tour.last().unwrap().get())] +=
+        delta_tau_matrix[reverse_order(self.tour[0].into(), self.tour.last().unwrap().into())] +=
             delta_tau;
     }
 

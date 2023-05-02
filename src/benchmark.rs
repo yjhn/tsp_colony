@@ -70,6 +70,7 @@ pub fn benchmark_ant_cycle<PD, R>(
     betas: &[Float],
     qs: &[Float],
     ros: &[Float],
+    lowercase_qs: &[u16],
     init_intensities: &[Float],
     mpi: &Mpi,
 ) where
@@ -103,7 +104,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                 // Construct the solver here, as nothing meaningfull will change in
                 // the inner loops.
                 let mut ant_cycle = AntCycle::new(
-                    p as usize, &mut rng, &problem, 0.0, 0.0, beta, 0.0, 0.0, mpi,
+                    p as usize, &mut rng, &problem, 0.0, 0.0, beta, 0.0, 0.0, 0, mpi,
                 );
 
                 for &intense in init_intensities {
@@ -118,116 +119,120 @@ pub fn benchmark_ant_cycle<PD, R>(
                             for &ro in ros {
                                 ant_cycle.set_ro(ro);
 
-                                // Figure out where to save the results.
-                                let mut skip = [false];
-                                let save_file_path = if mpi.is_root {
-                                    let mut save_file_path = format!(
+                                for &lowercase_q in lowercase_qs {
+                                    ant_cycle.set_lowercase_q(lowercase_q);
+
+                                    // Figure out where to save the results.
+                                    let mut skip = [false];
+                                    let save_file_path = if mpi.is_root {
+                                        let mut save_file_path = format!(
                                         "{dir}/bm_{name}_{cpus}cpus_p{p}_q{q}_a{a}_b{b}_ro{r}_intensity{i}.json",
                                         dir=results_dir, name=problem.name(), cpus=process_count, p=p, q=q,
                                         a=alpha, b=beta, r=ro, i=intense
                                     );
-                                    match get_output_file_path(
-                                        &mut save_file_path,
-                                        results_dir,
-                                        duplicate_handling,
-                                    ) {
-                                        BenchAction::Continue => (),
-                                        BenchAction::SkipBench => skip[0] = true,
-                                        BenchAction::Abort => mpi.world.abort(1),
-                                    };
-                                    save_file_path
-                                } else {
-                                    String::new()
-                                };
-                                mpi.root_process.broadcast_into(&mut skip);
-                                if skip[0] {
-                                    continue;
-                                }
-
-                                // Run and time the benchmark.
-                                let mut run_results = Vec::new();
-                                let bench_start_absolute = SystemTime::now();
-                                let bench_start = Instant::now();
-
-                                let bench_config = BenchmarkConfig {
-                                    process_count,
-                                    problem: ShortProblemDesc {
-                                        name: problem.name(),
-                                        optimal_length: problem.solution_length(),
-                                    },
-                                    algorithm: "AntCycle",
-                                    algorithm_constants: AntCycleConstants {
-                                        population_size: p,
-                                        alpha,
-                                        beta,
-                                        q,
-                                        ro,
-                                        max_iterations,
-                                        init_intensity: intense,
-                                    },
-                                    repeat_times,
-                                };
-
-                                if mpi.is_root {
-                                    eprintln!(
-                                        "{}",
-                                        serde_json::to_string_pretty(&bench_config).unwrap()
-                                    );
-                                }
-
-                                for run_number in 0..repeat_times {
-                                    // for run_number in 0.. {
-                                    let run_start = Instant::now();
-
-                                    // todo!("Benchmark logic goes here");
-                                    let found_optimal_tour =
-                                        ant_cycle.iterate_until_optimal(max_iterations);
-                                    // Needed returns: found_optimal, shortest_found (per getter), iteration_reached (galima paimti per getter)
-                                    if mpi.is_root {
-                                        let run_duration = run_start.elapsed();
-                                        let result = RunResult {
-                                            run_number,
-                                            found_optimal_tour,
-                                            shortest_found_tour: ant_cycle.best_tour().length(),
-                                            iteration_reached: ant_cycle.iteration(),
-                                            duration_millis: run_duration.as_millis(),
+                                        match get_output_file_path(
+                                            &mut save_file_path,
+                                            results_dir,
+                                            duplicate_handling,
+                                        ) {
+                                            BenchAction::Continue => (),
+                                            BenchAction::SkipBench => skip[0] = true,
+                                            BenchAction::Abort => mpi.world.abort(1),
                                         };
+                                        save_file_path
+                                    } else {
+                                        String::new()
+                                    };
+                                    mpi.root_process.broadcast_into(&mut skip);
+                                    if skip[0] {
+                                        continue;
+                                    }
 
-                                        // Dump partial results in case the benchmark is killed before completing all the runs.
+                                    // Run and time the benchmark.
+                                    let mut run_results = Vec::new();
+                                    let bench_start_absolute = SystemTime::now();
+                                    let bench_start = Instant::now();
+
+                                    let bench_config = BenchmarkConfig {
+                                        process_count,
+                                        problem: ShortProblemDesc {
+                                            name: problem.name(),
+                                            optimal_length: problem.solution_length(),
+                                        },
+                                        algorithm: "AntCycle",
+                                        algorithm_constants: AntCycleConstants {
+                                            population_size: p,
+                                            alpha,
+                                            beta,
+                                            q,
+                                            ro,
+                                            max_iterations,
+                                            init_intensity: intense,
+                                        },
+                                        repeat_times,
+                                    };
+
+                                    if mpi.is_root {
                                         eprintln!(
                                             "{}",
-                                            serde_json::to_string_pretty(&result).unwrap()
+                                            serde_json::to_string_pretty(&bench_config).unwrap()
                                         );
-
-                                        run_results.push(result);
                                     }
-                                    if found_optimal_tour {
-                                        break;
+
+                                    for run_number in 0..repeat_times {
+                                        // for run_number in 0.. {
+                                        let run_start = Instant::now();
+
+                                        // todo!("Benchmark logic goes here");
+                                        let found_optimal_tour =
+                                            ant_cycle.iterate_until_optimal(max_iterations);
+                                        // Needed returns: found_optimal, shortest_found (per getter), iteration_reached (galima paimti per getter)
+                                        if mpi.is_root {
+                                            let run_duration = run_start.elapsed();
+                                            let result = RunResult {
+                                                run_number,
+                                                found_optimal_tour,
+                                                shortest_found_tour: ant_cycle.best_tour().length(),
+                                                iteration_reached: ant_cycle.iteration(),
+                                                duration_millis: run_duration.as_millis(),
+                                            };
+
+                                            // Dump partial results in case the benchmark is killed before completing all the runs.
+                                            eprintln!(
+                                                "{}",
+                                                serde_json::to_string_pretty(&result).unwrap()
+                                            );
+
+                                            run_results.push(result);
+                                        }
+                                        if found_optimal_tour {
+                                            break;
+                                        }
+                                        ant_cycle.reset_all_state();
                                     }
-                                    ant_cycle.reset_all_state();
-                                }
 
-                                let bench_duration = bench_start.elapsed();
+                                    let bench_duration = bench_start.elapsed();
 
-                                // Output results.
-                                if mpi.is_root {
-                                    let results = BenchmarkResults {
-                                        bench_config,
-                                        benchmark_start_time_millis: bench_start_absolute
-                                            .duration_since(UNIX_EPOCH)
-                                            .unwrap()
-                                            .as_millis(),
-                                        benchmark_duration_millis: bench_duration.as_millis(),
-                                        run_results,
-                                    };
-                                    let json = serde_json::to_string_pretty(&results).unwrap();
-                                    // This is the actual meaningful output, so dump it to stdout
-                                    // instead of stderr (allows to easily redirect it to file).
-                                    println!("{json}");
-                                    let mut file =
-                                        open_output_file(&save_file_path, duplicate_handling);
-                                    eprintln!("Saving results to '{save_file_path}'");
-                                    file.write_all(json.as_bytes());
+                                    // Output results.
+                                    if mpi.is_root {
+                                        let results = BenchmarkResults {
+                                            bench_config,
+                                            benchmark_start_time_millis: bench_start_absolute
+                                                .duration_since(UNIX_EPOCH)
+                                                .unwrap()
+                                                .as_millis(),
+                                            benchmark_duration_millis: bench_duration.as_millis(),
+                                            run_results,
+                                        };
+                                        let json = serde_json::to_string_pretty(&results).unwrap();
+                                        // This is the actual meaningful output, so dump it to stdout
+                                        // instead of stderr (allows to easily redirect it to file).
+                                        println!("{json}");
+                                        let mut file =
+                                            open_output_file(&save_file_path, duplicate_handling);
+                                        eprintln!("Saving results to '{save_file_path}'");
+                                        file.write_all(json.as_bytes());
+                                    }
                                 }
                             }
                         }
@@ -262,7 +267,14 @@ fn get_output_file_path(
             }
 
             DuplicateHandling::SwitchName => {
-                candidate_path.push_str(format!("{}", rand::random::<u32>()).as_str());
+                // candidate_path.push_str(format!("{}", rand::random::<u32>()).as_str());
+                candidate_path.push_str(&format!(
+                    "{}",
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs()
+                ));
                 eprintln!("will save new results to '{candidate_path}'");
             }
             // Handled later.

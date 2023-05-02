@@ -1,14 +1,18 @@
 use std::{cmp::max, time::Instant};
 
 use mpi::traits::CommunicatorCollectives;
-use rand::{distributions, prelude::Distribution, Rng, SeedableRng};
+use rand::{
+    distributions::{self, Uniform},
+    prelude::Distribution,
+    Rng, SeedableRng,
+};
 
 use crate::{
     ant::Ant,
     config::Float,
     matrix::SquareMatrix,
     pheromone_visibility_matrix::PheromoneVisibilityMatrix,
-    tour::{CityIndex, Tour},
+    tour::{CityIndex, Tour, TourFunctions},
     tsp_problem::TspProblem,
     utils::Mpi,
 };
@@ -28,7 +32,9 @@ pub struct AntCycle<'a, R: Rng + SeedableRng> {
     alpha: Float,
     capital_q_mul: Float,
     initial_trail_intensity: Float,
+    lowercase_q: u16,
     mpi: &'a Mpi<'a>,
+    cities_distrib: Uniform<u16>,
 }
 
 impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
@@ -41,11 +47,12 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         beta: Float,
         capital_q_mul: Float,
         ro: Float,
+        lowercase_q: u16,
         mpi: &'a Mpi,
     ) -> AntCycle<'a, R> {
-        let city_count = tsp_problem.number_of_cities();
+        let city_count = tsp_problem.number_of_cities() as u16;
         let pheromone_matrix = PheromoneVisibilityMatrix::new(
-            city_count,
+            city_count as usize,
             initial_trail_intensity,
             tsp_problem.distances(),
             beta,
@@ -74,7 +81,9 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             alpha,
             capital_q_mul,
             initial_trail_intensity,
+            lowercase_q,
             mpi,
+            cities_distrib: distributions::Uniform::new(0, city_count as u16).unwrap(),
         }
     }
 
@@ -97,10 +106,12 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
 
     pub fn reset_all_state(&mut self) {
         // Reset ants.
-        let num_cities = self.tsp_problem.number_of_cities();
-        let mut distrib = distributions::Uniform::new(0, num_cities).unwrap();
+        let num_cities = self.number_of_cities();
         for a in self.ants.iter_mut() {
-            a.reset_to_city(num_cities, CityIndex::new(distrib.sample(&mut self.rng)));
+            a.reset_to_city(
+                num_cities,
+                CityIndex::new(self.cities_distrib.sample(&mut self.rng)),
+            );
         }
         self.time = 0;
         self.iteration = 0;
@@ -110,8 +121,7 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
     }
 
     pub fn iterate_until_optimal(&mut self, max_iterations: u32) -> bool {
-        let num_cities = self.tsp_problem.number_of_cities();
-        let mut distrib = distributions::Uniform::new(0, num_cities).unwrap();
+        let num_cities = self.number_of_cities() as usize;
         let distrib01 = distributions::Uniform::new(0.0, 1.0).unwrap();
 
         struct ShortestIterationTour {
@@ -168,9 +178,9 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
                 ant.update_pheromone(&mut delta_tau_matrix, self.capital_q_mul);
             }
 
-            for x in 0..num_cities {
+            for x in 0..(num_cities as u16) {
                 for y in 0..x {
-                    let delta = delta_tau_matrix[(x, y)];
+                    let delta = delta_tau_matrix[(x.into(), y.into())];
                     self.pheromone_matrix.adjust_pheromone(
                         (CityIndex::new(x), CityIndex::new(y)),
                         if delta > min_tau { delta } else { min_tau },
@@ -188,20 +198,6 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             self.iteration += 1;
             self.time += num_cities;
 
-            // TODO: use all_gather_into for actual information exchange:
-            // first, all processors exchange info on the routes of their best routes so far
-            // then, each processor chooses with which processor to exchange info and does it
-            let send_buf = [self.mpi.rank];
-            let mut recv_buf = vec![0; self.mpi.world_size as usize];
-            self.mpi.world.all_gather_into(&send_buf, &mut recv_buf);
-            if self.mpi.is_root {
-                dbg!(recv_buf);
-            }
-
-            if self.iteration == max_iterations {
-                println!("Stopping, reached max iterations count");
-                break;
-            }
             if self.best_tour.length() == self.tsp_problem.solution_length() {
                 println!(
                     "Stopping, reached optimal length in iteration {}",
@@ -210,6 +206,61 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
                 found_optimal = true;
                 break;
             }
+
+            // TODO: use all_gather_into for actual information exchange:
+            // first, all processors exchange info on the routes of their best routes so far
+            // then, each processor chooses with which processor to exchange info and does it
+            // Leave one extra space in the buffer for each tour, because tour length
+            // will be appended to them.
+            let world_size = self.mpi.world_size as usize;
+            self.best_tour.hack_append_length_at_tour_end();
+            self.best_tour.hack_append_mpi_rank(self.mpi.rank);
+            let mut recv_buf =
+                vec![CityIndex::new(0); world_size * self.best_tour.number_of_cities() as usize];
+            self.mpi
+                .world
+                .all_gather_into(self.best_tour.cities(), &mut recv_buf);
+            self.best_tour.remove_hack_mpi_rank();
+            self.best_tour.remove_hack_length();
+            // if self.mpi.is_root {
+            //     for i in 0..self.mpi.world_size {
+            //         eprintln!(
+            //             "{:?}",
+            //             &recv_buf[(i as usize * (self.number_of_cities() + 1)) as usize
+            //                 ..((i + 1) as usize * (self.number_of_cities() + 1)) as usize]
+            //         );
+            //     }
+            // }
+            let mut similarities = Vec::with_capacity(world_size);
+            for one_proc_best_tour_with_hacks_appended in recv_buf.chunks_exact(num_cities + 4) {
+                let dist = self
+                    .best_tour
+                    .distance(&one_proc_best_tour_with_hacks_appended[..num_cities]);
+                // Find distance calculation needs to ignore the appended length and rank.
+                similarities.push((
+                    dist,
+                    one_proc_best_tour_with_hacks_appended.get_hack_mpi_rank(),
+                    one_proc_best_tour_with_hacks_appended[..(num_cities + 2)]
+                        .get_hack_tour_length_from_last_element(),
+                ));
+            }
+            similarities.sort_unstable();
+            if self.mpi.is_root {
+                dbg!(&similarities);
+            }
+            // First item in the sorted list will be this cpu, since the distance to oneself is 0.
+            let neighbour: Float = similarities
+                .iter()
+                .skip(1)
+                .take(self.lowercase_q.into())
+                .copied()
+                .map(|(dist, rank, length)| dist)
+                .sum::<u16>() as Float
+                / self.lowercase_q as Float;
+
+            // TODO: choose exchange partner and perform exchange
+            // to do this, we will need to calculate neighbour values for all other CPUs
+
             if stale {
                 println!(
                     "Stopping, colony is stale (all ants likely found the same tour). Iteration {}",
@@ -217,10 +268,17 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
                 );
                 break;
             }
+            if self.iteration == max_iterations {
+                println!("Stopping, reached max iterations count");
+                break;
+            }
 
             // Reset ants.
             for a in self.ants.iter_mut() {
-                a.reset_to_city(num_cities, CityIndex::new(distrib.sample(&mut self.rng)));
+                a.reset_to_city(
+                    num_cities as u16,
+                    CityIndex::new(self.cities_distrib.sample(&mut self.rng)),
+                );
             }
 
             // dbg!(t.elapsed().as_nanos());
@@ -229,11 +287,19 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         found_optimal
     }
 
+    pub fn number_of_cities(&self) -> u16 {
+        self.tsp_problem.number_of_cities()
+    }
+
     pub fn iteration(&self) -> u32 {
         self.iteration
     }
 
     pub fn best_tour(&self) -> &Tour {
         &self.best_tour
+    }
+
+    pub fn set_lowercase_q(&mut self, q: u16) {
+        self.lowercase_q = q;
     }
 }

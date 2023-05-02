@@ -2,8 +2,11 @@ use crate::distance_matrix::DistanceMatrix;
 use crate::matrix::SquareMatrix;
 use crate::utils::all_cities;
 use crate::utils::order;
+use mpi::traits::Equivalence;
 use rand::prelude::SliceRandom;
 use rand::Rng;
+use std::fmt::write;
+use std::fmt::Debug;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::BufWriter;
@@ -12,22 +15,48 @@ use std::path::Path;
 use std::slice::Windows;
 
 /// Index of the city in the city matrix.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct CityIndex(usize);
+/// `u16` is enough since it is extremely unlikely that number of cities would be greater.
+// TODO: it would be enough to use u16 here instead of usize
+// #[repr(transparent)] is not needed hare as we do no transmutes and thus
+// do not rely on the exact layout of CityIndex.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Equivalence)]
+pub struct CityIndex(u16);
 
 impl CityIndex {
-    pub fn new(index: usize) -> CityIndex {
+    pub fn new(index: u16) -> CityIndex {
         CityIndex(index)
     }
+}
 
-    pub fn get(self) -> usize {
-        self.0
+impl From<CityIndex> for u16 {
+    fn from(value: CityIndex) -> Self {
+        value.0
+    }
+}
+
+impl From<CityIndex> for usize {
+    fn from(value: CityIndex) -> Self {
+        value.0.into()
+    }
+}
+
+// TODO: where is this used?
+impl From<&CityIndex> for usize {
+    fn from(value: &CityIndex) -> Self {
+        value.0.into()
+    }
+}
+
+impl Debug for CityIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
 impl Display for CityIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "CityIndex({})", self.0)
+        // write!(f, "CityIndex({})", self.0)
+        write!(f, "{}", self.0)
     }
 }
 
@@ -65,8 +94,13 @@ impl Tour {
     }
 
     pub fn from_hack_cities(mut cities_with_length: Vec<CityIndex>) -> Tour {
-        let tour_length_usize = cities_with_length.pop().unwrap().get();
-        let tour_length = tour_length_usize as u32;
+        // Length is stored as two CityIndex'es in big endian order (i. e. u16 at [end]
+        // is the lower end and u16 at [end - 1] is the higher end)
+        let tour_length_part_1: u16 = cities_with_length.pop().unwrap().into();
+        let tour_length_part_2: u16 = cities_with_length.pop().unwrap().into();
+        let [b3, b4] = tour_length_part_1.to_be_bytes();
+        let [b1, b2] = tour_length_part_2.to_be_bytes();
+        let tour_length = u32::from_be_bytes([b1, b2, b3, b4]);
         // Cities don't contain length anymore.
         let cities = cities_with_length;
 
@@ -76,7 +110,7 @@ impl Tour {
         }
     }
 
-    pub fn random(city_count: usize, distances: &DistanceMatrix, rng: &mut impl Rng) -> Tour {
+    pub fn random(city_count: u16, distances: &DistanceMatrix, rng: &mut impl Rng) -> Tour {
         assert!(city_count > 1);
 
         let mut cities = all_cities(city_count);
@@ -92,13 +126,15 @@ impl Tour {
     // This function call must be matched by the corresponding
     // call to remove_hack_length().
     pub fn hack_append_length_at_tour_end(&mut self) {
-        // This is only valid on >=32 bit architectures.
-        let length_usize = self.tour_length as usize;
-        let length_index = CityIndex::new(length_usize);
-        self.cities.push(length_index);
+        let [b1, b2, b3, b4] = self.tour_length.to_be_bytes();
+        self.cities
+            .push(CityIndex::new(u16::from_be_bytes([b1, b2])));
+        self.cities
+            .push(CityIndex::new(u16::from_be_bytes([b3, b4])));
     }
 
     pub fn remove_hack_length(&mut self) {
+        self.cities.pop();
         self.cities.pop();
     }
 
@@ -121,59 +157,10 @@ impl Tour {
 
         // Use indices starting at 1 for output, same as TSPLIB
         // format for consistency.
-        for city in &self.cities {
-            write!(file, "{} ", city.get() + 1).unwrap();
+        for city in self.cities.iter().copied() {
+            write!(file, "{} ", u16::from(city) + 1).unwrap();
         }
         writeln!(file).unwrap();
-    }
-
-    pub fn nearest_neighbour(
-        city_count: usize,
-        starting_city: Option<usize>,
-        distances: &SquareMatrix<u32>,
-        rng: &mut impl Rng,
-    ) -> Tour {
-        let starting_city = if let Some(c) = starting_city {
-            c
-        } else {
-            rng.gen_range(0..city_count)
-        };
-
-        let mut cities = Vec::with_capacity(city_count);
-
-        // Still unused cities.
-        let mut unused_cities: Vec<usize> = (0..city_count).collect();
-        unused_cities.swap_remove(starting_city);
-
-        let mut tour_length = 0;
-        let mut last_added_city = starting_city;
-
-        while !unused_cities.is_empty() {
-            let mut min_distance = u32::MAX;
-            let mut min_distance_city = unused_cities[0];
-            let mut min_distance_city_idx = 0;
-            for (i, &c) in unused_cities.iter().enumerate() {
-                let dist = distances[(last_added_city, c)];
-                if dist < min_distance {
-                    min_distance = dist;
-                    min_distance_city = c;
-                    min_distance_city_idx = i;
-                }
-            }
-
-            // Insert.
-            cities.push(CityIndex::new(min_distance_city));
-            last_added_city = min_distance_city;
-            tour_length += min_distance;
-            unused_cities.swap_remove(min_distance_city_idx);
-        }
-
-        tour_length += distances[(last_added_city, starting_city)];
-
-        Tour {
-            cities,
-            tour_length,
-        }
     }
 
     pub fn last_to_first_path(&self) -> (CityIndex, CityIndex) {
@@ -197,41 +184,45 @@ impl Tour {
         }
     }
 
-    /// Returns the number of paths (edges) in one ant's tour that are not in other's.
-    /// Assumes that both ants have already fully constructed their tours.
-    pub fn distance(&self, other: &Tour) -> u32 {
-        debug_assert_eq!(self.number_of_cities(), other.number_of_cities());
-
-        // City count and path count is the same.
-        let num_cities = self.number_of_cities();
-        let mut common_edges = 0;
-        for pair in self.paths() {
-            let &[c1, c2] = pair else { unreachable!() };
-            common_edges += other.has_edge(c1, c2) as u32;
-        }
-        common_edges += other.has_edge(self.cities[0], *self.cities.last().unwrap()) as u32;
-
-        num_cities as u32 - common_edges
+    pub fn distance(&self, other: &[CityIndex]) -> u16 {
+        self.cities.distance(other)
     }
 
     /// Returns true if the tour being constructed by this ant has in edge between `first`
     /// and `second`. Order does not matter.
-    fn has_edge(&self, first: CityIndex, second: CityIndex) -> bool {
-        let inner_paths = self.paths().any(|pair| {
-            let &[c1, c2] = pair else { unreachable!() };
-            order(first, second) == order(c1, c2)
-        });
-        inner_paths || order(first, second) == order(self.cities[0], *self.cities.last().unwrap())
+    pub fn has_path(&self, x: CityIndex, y: CityIndex) -> bool {
+        self.cities.has_path(x, y)
+    }
+
+    pub fn hack_append_mpi_rank(&mut self, rank: i32) {
+        let [b1, b2, b3, b4] = rank.to_be_bytes();
+        self.cities
+            .push(CityIndex::new(u16::from_be_bytes([b1, b2])));
+        self.cities
+            .push(CityIndex::new(u16::from_be_bytes([b3, b4])));
+    }
+
+    pub fn remove_hack_mpi_rank(&mut self) {
+        self.cities.pop();
+        self.cities.pop();
     }
 }
 
-pub trait Length {
+pub trait TourFunctions {
     fn calculate_tour_length(&self, distances: &DistanceMatrix) -> u32;
 
-    fn hack_get_tour_length_from_last_element(&self) -> u32;
+    fn get_hack_tour_length_from_last_element(&self) -> u32;
+
+    fn paths(&self) -> Windows<CityIndex>;
+
+    fn has_path(&self, x: CityIndex, y: CityIndex) -> bool;
+
+    fn distance(&self, other: &[CityIndex]) -> u16;
+
+    fn get_hack_mpi_rank(&self) -> i32;
 }
 
-impl Length for [CityIndex] {
+impl TourFunctions for [CityIndex] {
     fn calculate_tour_length(&self, distances: &DistanceMatrix) -> u32 {
         assert!(self.len() > 1);
 
@@ -246,9 +237,52 @@ impl Length for [CityIndex] {
     }
 
     // The length must first be inserted using Tour::hack_append_length_at_tour_end().
-    fn hack_get_tour_length_from_last_element(&self) -> u32 {
-        let tour_length_usize = self.last().unwrap().get();
+    fn get_hack_tour_length_from_last_element(&self) -> u32 {
+        // Length is stored as two CityIndex'es in big endian order (i. e. u16 at [end]
+        // is the lower end and u16 at [end - 1] is the higher end)
+        let tour_length_part_1: u16 = self[self.len() - 1].into();
+        let tour_length_part_2: u16 = self[self.len() - 2].into();
+        let [b3, b4] = tour_length_part_1.to_be_bytes();
+        let [b1, b2] = tour_length_part_2.to_be_bytes();
+        u32::from_be_bytes([b1, b2, b3, b4])
+    }
 
-        tour_length_usize as u32
+    fn has_path(&self, x: CityIndex, y: CityIndex) -> bool {
+        let inner_paths = self.paths().any(|pair| {
+            let &[c1, c2] = pair else { unreachable!() };
+            order(x, y) == order(c1, c2)
+        });
+        inner_paths || order(x, y) == order(self[0], *self.last().unwrap())
+    }
+
+    /// Returns the number of paths (edges) in one tour that are not in other.
+    /// Assumes that both tours have the same number of cities.
+    fn distance(&self, other: &[CityIndex]) -> u16 {
+        debug_assert_eq!(self.len(), other.len());
+
+        // City count and path count is the same.
+        let num_cities = self.len() as u16;
+        let mut common_edges = 0;
+        for pair in self.paths() {
+            let &[c1, c2] = pair else { unreachable!() };
+            common_edges += other.has_path(c1, c2) as u16;
+        }
+        common_edges += other.has_path(self[0], *self.last().unwrap()) as u16;
+
+        num_cities - common_edges
+    }
+
+    fn paths(&self) -> Windows<CityIndex> {
+        self.windows(2)
+    }
+
+    fn get_hack_mpi_rank(&self) -> i32 {
+        // Length is stored as two CityIndex'es in big endian order (i. e. u16 at [end]
+        // is the lower end and u16 at [end - 1] is the higher end)
+        let rank_part_1: u16 = self[self.len() - 1].into();
+        let rank_part_2: u16 = self[self.len() - 2].into();
+        let [b3, b4] = rank_part_1.to_be_bytes();
+        let [b1, b2] = rank_part_2.to_be_bytes();
+        i32::from_be_bytes([b1, b2, b3, b4])
     }
 }

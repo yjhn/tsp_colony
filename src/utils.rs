@@ -24,7 +24,7 @@ pub fn reverse_order<T: Ord>(a: T, b: T) -> (T, T) {
 }
 
 /// Creates a new `Vec<CityIndex>` containing all cities in order.
-pub fn all_cities(count: usize) -> Vec<CityIndex> {
+pub fn all_cities(count: u16) -> Vec<CityIndex> {
     (0..count).map(CityIndex::new).collect()
 }
 
@@ -32,7 +32,7 @@ pub fn all_cities(count: usize) -> Vec<CityIndex> {
 /// Empties `buf` before proceeding.
 /// It is neccessary to take `Vec` instead of slice,
 /// since new elements need to be inserted.
-pub fn all_cities_fill(buf: &mut Vec<CityIndex>, count: usize) {
+pub fn all_cities_fill(buf: &mut Vec<CityIndex>, count: u16) {
     buf.clear();
     buf.extend((0..count).map(CityIndex::new));
 }

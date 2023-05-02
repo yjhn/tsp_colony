@@ -1,0 +1,80 @@
+Compile and Rust programs using rsmpi on MIF HPC cluster
+(current OS: Qlustar 12 based on Ubuntu 20.04)
+
+
+# Runing
+
+1. Copy files to the HPC cluster
+You need to first copy files to MIF computer:
+scp <file> <username>@uosis.mif.vu.lt:Desktop/kursinis
+or
+scp -r <dir> <username>@uosis.mif.vu.lt:Desktop
+
+2. then from there copy them to to the cluster:
+scp <file> <username>@hpc:
+
+OR, set up SSH access using the wiki instructions found at
+https://mif.vu.lt/itwiki/hpc
+and then you can SSH and scp directly to HPC:
+ssh hpc.mif.vu.lt
+scp -r src Cargo.* data hpc.mif.vu.lt:kursinis
+
+3. Compile the project in release mode:
+https://blog.rust-lang.org/2023/03/09/Rust-1.68.0.html#cargos-sparse-protocol
+
+cd <project dir>
+
+module load openmpi
+source "$HOME/.cargo/env"
+CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse C_INCLUDE_PATH=/usr/lib/gcc/x86_64-linux-gnu/9/include"${C_INCLUDE_PATH+:}${C_INCLUDE_PATH-}" LIBCLANG_PATH="/scratch/lustre/home/<username>/clang_stuff/usr/lib/llvm-12/lib" RUSTFLAGS="-C target-cpu=native" cargo build --release
+
+4. Run the program
+
+more info here:
+https://mif.vu.lt/itwiki/hpc#paketinis_uzduociu_vykdymas_slurm
+and here
+https://hpc.nmsu.edu/discovery/slurm/slurm-commands/
+
+# /// file run.sh
+#!/bin/bash
+#SBATCH -o run_4t.out
+#SBATCH -p main
+#SBATCH --time 0-20:00:00
+#SBATCH -n4
+module load openmpi
+mpirun <program exec dir (relative path)> <program args>
+# ///
+
+chmod +x run.sh
+
+Enter the instant run environment (not necessary, but otherwise jobs are queued and might run later)
+This will run the program instantly, but will give one core only.
+module load openmpi
+srun --pty $SHELL
+mpirun <program>
+exit
+
+Alternatively, execute in batch mode.
+sbatch run.sh
+
+# program output will be in file run_4t.out
+
+# Installing the prerequisites
+
+1. Install Rust:
+
+# in user's home dir (/scratch/lustre/home/<username>)
+wget https://sh.rustup.rs -O rustup-init.sh
+chmod +x rustup-init.sh
+./rustup-init.sh --no-modify-path
+
+2. Install stuff for bindgen (needed by rsmpi):
+
+apt-get download libgcc-s1 libllvm12 libclang1-12
+mkdir clang_stuff
+dpkg -x libgcc-s1_10.3.0-1ubuntu1~20.04_amd64.deb clang_stuff
+dpkg -x libllvm12_1%3a12.0.0-3ubuntu1~20.04.5_amd64.deb clang_stuff
+dpkg -x libclang1-12_1%3a12.0.0-3ubuntu1~20.04.5_amd64.deb clang_stuff
+
+# View squeue full job name
+sacct --format="JobID,JobName%30"

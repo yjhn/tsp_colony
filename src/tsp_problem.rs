@@ -47,6 +47,10 @@ impl TspProblem {
             "a280 has two identical cities, this can cause problems"
         );
         let number_of_cities = tsp.dim();
+        // CityIndex is a u16, so we cannot have more cities.
+        if number_of_cities > u16::MAX as usize {
+            panic!("Number of cities cannot be greater than 16384, is {number_of_cities}");
+        }
         let cities = {
             let coord_map = tsp.node_coords();
             let mut cities = Vec::with_capacity(number_of_cities);
@@ -74,8 +78,8 @@ impl TspProblem {
         }
     }
 
-    pub fn number_of_cities(&self) -> usize {
-        self.cities.len()
+    pub fn number_of_cities(&self) -> u16 {
+        self.cities.len() as u16
     }
 
     pub fn distances(&self) -> &DistanceMatrix {
@@ -130,7 +134,11 @@ impl TspProblem {
                     WeightKind::Custom => unimplemented!(),
                     WeightKind::Undefined => unimplemented!(),
                 };
-                distances.set_dist(CityIndex::new(ind1 - 1), CityIndex::new(ind2 - 1), dist);
+                distances.set_dist(
+                    CityIndex::new(ind1 as u16 - 1),
+                    CityIndex::new(ind2 as u16 - 1),
+                    dist,
+                );
             }
         }
         distances
@@ -162,7 +170,7 @@ fn generate_cities<R: Rng + SeedableRng>(
         for j in (i + 1)..city_count {
             let distance_f64 = Point::distance(cities[i], cities[j]);
             let distance = nint(distance_f64);
-            distances.set_dist(CityIndex::new(i), CityIndex::new(j), distance);
+            distances.set_dist(CityIndex::new(i as u16), CityIndex::new(j as u16), distance);
         }
     }
 

@@ -42,20 +42,20 @@ impl PheromoneVisibilityMatrix {
     pub fn pheromone(&self, (x, y): (CityIndex, CityIndex)) -> Float {
         debug_assert!(x > y);
 
-        self.matrix[(x.get(), y.get())]
+        self.matrix[(x.into(), y.into())]
     }
 
     // x must be lower than y
     pub fn visibility(&self, (x, y): (CityIndex, CityIndex)) -> Float {
         debug_assert!(x < y);
 
-        self.matrix[(x.get(), y.get())]
+        self.matrix[(x.into(), y.into())]
     }
 
     pub fn adjust_pheromone(&mut self, (x, y): (CityIndex, CityIndex), delta_tau: Float) {
         debug_assert!(x > y, "x: {x}, y: {y}");
 
-        self.matrix[(x.get(), y.get())] += delta_tau;
+        self.matrix[(x.into(), y.into())] += delta_tau;
     }
 
     pub fn set_ro(&mut self, ro: Float) {

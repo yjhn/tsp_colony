@@ -19,8 +19,8 @@ impl DistanceMatrix {
 
     pub fn set_dist(&mut self, c1: CityIndex, c2: CityIndex, distance: DistanceT) {
         // Distance matrix is symmetric.
-        self.0[(c1.get(), c2.get())] = distance;
-        self.0[(c2.get(), c1.get())] = distance;
+        self.0[(c1.into(), c2.into())] = distance;
+        self.0[(c2.into(), c1.into())] = distance;
     }
 }
 
@@ -37,6 +37,6 @@ impl Index<(CityIndex, CityIndex)> for DistanceMatrix {
     type Output = DistanceT;
 
     fn index(&self, (x, y): (CityIndex, CityIndex)) -> &Self::Output {
-        &self.0[(x.get(), y.get())]
+        &self.0[(x.into(), y.into())]
     }
 }
