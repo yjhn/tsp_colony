@@ -143,10 +143,9 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             // Each ant constructs a tour, keep track of the shortest and longest tours
             // found in this iteration.
             let iteration_tours = self.construct_ant_tours(&distrib01);
-            let stale = iteration_tours.is_colony_stale();
 
             // Update pheromone.
-            self.update_pheromone(&mut delta_tau_matrix, &iteration_tours);
+            let min_delta_tau = self.update_pheromone(&mut delta_tau_matrix, &iteration_tours);
 
             // Keep track of the shortest tour.
             if iteration_tours.short_tour_length < self.best_tour.length() {
@@ -167,14 +166,13 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
                 break;
             }
 
+            //TODO: exchange at time inteval not at every iteration.
             self.exchange_best_tours(&mut cpus_best_tours_buf);
             // We can't use a matrix since the order of buffers from different CPUs is not
             // guranteed.
             let fitness =
                 self.calculate_proc_distances_fitness(&cpus_best_tours_buf, &mut proc_distances);
 
-            // TODO: choose exchange partner and perform exchange
-            // to do this, we will need to calculate neighbour values for all other CPUs
             let neighbour_values = self.calculate_neighbour_values(&mut proc_distances);
             let exchange_partner = self.select_exchange_partner(
                 &fitness,
@@ -185,8 +183,18 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             if self.mpi.is_root {
                 dbg!(&proc_distances);
             }
+            let best_partner_tour = &cpus_best_tours_buf[(exchange_partner
+                * (num_cities + Tour::APPENDED_HACK_ELEMENTS))
+                ..(exchange_partner * (num_cities + Tour::APPENDED_HACK_ELEMENTS))];
+            self.update_pheromones_from_partner(
+                &best_partner_tour[..best_partner_tour.len() - Tour::APPENDED_HACK_ELEMENTS],
+                fitness[exchange_partner],
+                fitness[self.mpi.rank as usize],
+                best_partner_tour.get_hack_tour_length(),
+                min_delta_tau,
+            );
 
-            if stale {
+            if iteration_tours.is_colony_stale() {
                 println!(
                     "Stopping, colony is stale (all ants likely found the same tour). Iteration {}",
                     self.iteration
@@ -271,15 +279,15 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         &mut self,
         mut delta_tau_matrix: &mut SquareMatrix<Float>,
         iteration_tours: &ShortLongIterationTours,
-    ) {
+    ) -> Float {
         self.pheromone_matrix.evaporate_pheromone();
 
         let capital_q = self.capital_q_mul * iteration_tours.long_tour_length as Float;
         // TODO: figure out if this should be calculated using best length so far or only from this iteration.
-        let min_tau = capital_q / iteration_tours.short_tour_length as f32;
+        let min_delta_tau = capital_q / iteration_tours.short_tour_length as f32;
 
         for ant in self.ants.iter() {
-            ant.update_pheromone(delta_tau_matrix, self.capital_q_mul);
+            ant.update_pheromone(delta_tau_matrix, capital_q);
         }
 
         for x in 0..self.number_of_cities() {
@@ -287,12 +295,17 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
                 let delta = delta_tau_matrix[(x.into(), y.into())];
                 self.pheromone_matrix.adjust_pheromone(
                     (CityIndex::new(x), CityIndex::new(y)),
-                    if delta > min_tau { delta } else { min_tau },
+                    if delta > min_delta_tau {
+                        delta
+                    } else {
+                        min_delta_tau
+                    },
                 );
             }
         }
 
         delta_tau_matrix.fill(0.0);
+        min_delta_tau
     }
 
     // Since MPI all_gather_into() places buffers from different CPUs in rank order,
@@ -390,6 +403,26 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
 
         // If no CPU is selected, choose a random one.
         cpu_random_order[0]
+    }
+
+    // TODO: either regular update OR this update can occur, not both after one iteration.
+    fn update_pheromones_from_partner(
+        &mut self,
+        best_partner_tour: &[CityIndex],
+        partner_fitness: Float,
+        self_fitness: Float,
+        best_partner_tour_length: u32,
+        delta_tau_min: Float,
+    ) {
+        // Formula 7 in the PACO paper.
+        let fit_gh = self_fitness / (self_fitness + partner_fitness);
+        self.pheromone_matrix.evaporate_pheromone();
+
+        // TODO: ar delta_tau_min skaičiuojamas kiekvienam procesoriui atskirai, ar visiems bendrai?
+        // kolkas naudoju lokaliai suskaičiuotą
+        // TODO: taip pat gauti delta_tau ir delta_tau_min iš kitų procesorių (vėlgi pridėti prie Tour galo)
+        let delta_tau = fit_gh * todo!("delta_tau_self") + fit_gh * todo!("delta_tau_partner");
+
     }
 }
 
