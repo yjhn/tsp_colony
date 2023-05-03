@@ -18,6 +18,12 @@ impl<T> SquareMatrix<T>
 where
     T: Copy,
 {
+    pub fn new(side_length: usize, init_value: T) -> SquareMatrix<T> {
+        let data = vec![init_value; side_length * side_length];
+
+        SquareMatrix { data, side_length }
+    }
+
     pub fn side_length(&self) -> usize {
         self.side_length
     }
@@ -25,16 +31,9 @@ where
     pub fn fill(&mut self, value: T) {
         self.data.fill(value);
     }
-}
 
-impl<T> SquareMatrix<T>
-where
-    T: Copy,
-{
-    pub fn new(side_length: usize, init_value: T) -> SquareMatrix<T> {
-        let data = vec![init_value; side_length * side_length];
-
-        SquareMatrix { data, side_length }
+    pub fn row_mut(&mut self, y: usize) -> &mut [T] {
+        &mut self.data[(self.side_length * y)..(self.side_length * (y + 1))]
     }
 }
 

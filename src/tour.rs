@@ -67,6 +67,9 @@ pub struct Tour {
 }
 
 impl Tour {
+    // How many elements are appended using hack methods for tour exchange.
+    pub const APPENDED_HACK_ELEMENTS: usize = 2;
+
     pub const PLACEHOLDER: Tour = Tour {
         cities: Vec::new(),
         tour_length: u32::MAX,
@@ -121,21 +124,6 @@ impl Tour {
             cities,
             tour_length,
         }
-    }
-
-    // This function call must be matched by the corresponding
-    // call to remove_hack_length().
-    pub fn hack_append_length_at_tour_end(&mut self) {
-        let [b1, b2, b3, b4] = self.tour_length.to_be_bytes();
-        self.cities
-            .push(CityIndex::new(u16::from_be_bytes([b1, b2])));
-        self.cities
-            .push(CityIndex::new(u16::from_be_bytes([b3, b4])));
-    }
-
-    pub fn remove_hack_length(&mut self) {
-        self.cities.pop();
-        self.cities.pop();
     }
 
     pub fn is_shorter_than(&self, other: &Tour) -> bool {
@@ -194,15 +182,29 @@ impl Tour {
         self.cities.has_path(x, y)
     }
 
-    pub fn hack_append_mpi_rank(&mut self, rank: i32) {
-        let [b1, b2, b3, b4] = rank.to_be_bytes();
+    // This function call must be matched by the corresponding
+    // call to remove_hack_length_and_mpi_rank().
+    // pub fn hack_append_length_and_mpi_rank(&mut self, rank: i32) {
+    pub fn hack_append_length(&mut self) {
+        // Tour length.
+        let [b1, b2, b3, b4] = self.tour_length.to_be_bytes();
         self.cities
             .push(CityIndex::new(u16::from_be_bytes([b1, b2])));
         self.cities
             .push(CityIndex::new(u16::from_be_bytes([b3, b4])));
+
+        // MPI rank.
+        // let [b1, b2, b3, b4] = rank.to_be_bytes();
+        // self.cities
+        //     .push(CityIndex::new(u16::from_be_bytes([b1, b2])));
+        // self.cities
+        //     .push(CityIndex::new(u16::from_be_bytes([b3, b4])));
     }
 
-    pub fn remove_hack_mpi_rank(&mut self) {
+    // pub fn remove_hack_length_and_mpi_rank(&mut self) {
+    pub fn remove_hack_length(&mut self) {
+        // self.cities.pop();
+        // self.cities.pop();
         self.cities.pop();
         self.cities.pop();
     }
@@ -211,7 +213,7 @@ impl Tour {
 pub trait TourFunctions {
     fn calculate_tour_length(&self, distances: &DistanceMatrix) -> u32;
 
-    fn get_hack_tour_length_from_last_element(&self) -> u32;
+    fn get_hack_tour_length(&self) -> u32;
 
     fn paths(&self) -> Windows<CityIndex>;
 
@@ -219,7 +221,7 @@ pub trait TourFunctions {
 
     fn distance(&self, other: &[CityIndex]) -> u16;
 
-    fn get_hack_mpi_rank(&self) -> i32;
+    // fn get_hack_mpi_rank(&self) -> i32;
 }
 
 impl TourFunctions for [CityIndex] {
@@ -236,10 +238,12 @@ impl TourFunctions for [CityIndex] {
         tour_length
     }
 
-    // The length must first be inserted using Tour::hack_append_length_at_tour_end().
-    fn get_hack_tour_length_from_last_element(&self) -> u32 {
+    // The length must first be inserted using Tour::hack_append_length_and_mpi_rank().
+    fn get_hack_tour_length(&self) -> u32 {
         // Length is stored as two CityIndex'es in big endian order (i. e. u16 at [end]
         // is the lower end and u16 at [end - 1] is the higher end)
+        // let tour_length_part_1: u16 = self[self.len() - 3].into();
+        // let tour_length_part_2: u16 = self[self.len() - 4].into();
         let tour_length_part_1: u16 = self[self.len() - 1].into();
         let tour_length_part_2: u16 = self[self.len() - 2].into();
         let [b3, b4] = tour_length_part_1.to_be_bytes();
@@ -276,13 +280,13 @@ impl TourFunctions for [CityIndex] {
         self.windows(2)
     }
 
-    fn get_hack_mpi_rank(&self) -> i32 {
-        // Length is stored as two CityIndex'es in big endian order (i. e. u16 at [end]
-        // is the lower end and u16 at [end - 1] is the higher end)
-        let rank_part_1: u16 = self[self.len() - 1].into();
-        let rank_part_2: u16 = self[self.len() - 2].into();
-        let [b3, b4] = rank_part_1.to_be_bytes();
-        let [b1, b2] = rank_part_2.to_be_bytes();
-        i32::from_be_bytes([b1, b2, b3, b4])
-    }
+    // fn get_hack_mpi_rank(&self) -> i32 {
+    //     // Length is stored as two CityIndex'es in big endian order (i. e. u16 at [end]
+    //     // is the lower end and u16 at [end - 1] is the higher end)
+    //     let rank_part_1: u16 = self[self.len() - 1].into();
+    //     let rank_part_2: u16 = self[self.len() - 2].into();
+    //     let [b3, b4] = rank_part_1.to_be_bytes();
+    //     let [b1, b2] = rank_part_2.to_be_bytes();
+    //     i32::from_be_bytes([b1, b2, b3, b4])
+    // }
 }

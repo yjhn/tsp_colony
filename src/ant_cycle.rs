@@ -4,6 +4,7 @@ use mpi::traits::CommunicatorCollectives;
 use rand::{
     distributions::{self, Uniform},
     prelude::Distribution,
+    seq::SliceRandom,
     Rng, SeedableRng,
 };
 
@@ -50,7 +51,7 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         lowercase_q: u16,
         mpi: &'a Mpi,
     ) -> AntCycle<'a, R> {
-        let city_count = tsp_problem.number_of_cities() as u16;
+        let city_count = tsp_problem.number_of_cities();
         let pheromone_matrix = PheromoneVisibilityMatrix::new(
             city_count as usize,
             initial_trail_intensity,
@@ -83,7 +84,7 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             initial_trail_intensity,
             lowercase_q,
             mpi,
-            cities_distrib: distributions::Uniform::new(0, city_count as u16).unwrap(),
+            cities_distrib: distributions::Uniform::new(0, city_count).unwrap(),
         }
     }
 
@@ -124,74 +125,33 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         let num_cities = self.number_of_cities() as usize;
         let distrib01 = distributions::Uniform::new(0.0, 1.0).unwrap();
 
-        struct ShortestIterationTour {
-            ant_idx: usize,
-            tour_length: u32,
-        }
         let mut found_optimal = false;
         let mut delta_tau_matrix = SquareMatrix::new(num_cities, 0.0);
 
+        let world_size = self.mpi.world_size as usize;
+        let mut cpu_random_order: Vec<usize> = (0..world_size).collect();
+        // We will never exchange with ourselves.
+        cpu_random_order.swap_remove(self.mpi.rank as usize);
+        // Buffer for CPUs' best tours.
+        // Tour::APPENDED_HACK_ELEMENTS extra spaces at the end ar for tour length and MPI rank.
+        let mut cpus_best_tours_buf =
+            vec![CityIndex::new(0); world_size * (num_cities + Tour::APPENDED_HACK_ELEMENTS)];
+        let mut proc_distances = SquareMatrix::new(world_size, 0);
+
         loop {
-            // let t = Instant::now();
             // TODO: gal precomputint pheromone.powf(alpha)? Vis tiek jis keičiasi tik kitoje iteracijoje.
-            // Each ant constructs a tour, keep track of the shortest tour found in this iteration.
-            let mut short = ShortestIterationTour {
-                ant_idx: 0,
-                tour_length: u32::MAX,
-            };
-            // Also keep track of the longest tour to calculate Q.
-            let mut longest_tour_length = 0;
-
-            // Colony is stale if all ants find the same tour. Since actually
-            // checking if tours match is expensive, we only check if they are
-            // of the same length.
-            let mut stale = true;
-            for (idx, ant) in self.ants.iter_mut().enumerate() {
-                for _ in 1..num_cities {
-                    ant.choose_next_city(self.rng, &distrib01, &self.pheromone_matrix, self.alpha);
-                }
-
-                let len = ant.tour_length(self.tsp_problem.distances());
-                // dbg!(len);
-                if len < short.tour_length {
-                    stale = false;
-                    short = ShortestIterationTour {
-                        ant_idx: idx,
-                        tour_length: len,
-                    };
-                } else if len > short.tour_length {
-                    stale = false;
-                }
-                if len > longest_tour_length {
-                    longest_tour_length = len;
-                }
-            }
+            // Each ant constructs a tour, keep track of the shortest and longest tours
+            // found in this iteration.
+            let mut iteration_tours = self.construct_ant_tours(&distrib01);
+            let stale = iteration_tours.short_tour_length == iteration_tours.long_tour_length;
 
             // Update pheromone.
-            self.pheromone_matrix.evaporate_pheromone();
+            self.update_pheromone(&mut delta_tau_matrix, &iteration_tours);
 
-            let capital_q = self.capital_q_mul * longest_tour_length as Float;
-            // TODO: figure out if this should be calculated using best length so far or only from this iteration.
-            let min_tau = capital_q / short.tour_length as f32;
-
-            for ant in self.ants.iter() {
-                ant.update_pheromone(&mut delta_tau_matrix, self.capital_q_mul);
-            }
-
-            for x in 0..(num_cities as u16) {
-                for y in 0..x {
-                    let delta = delta_tau_matrix[(x.into(), y.into())];
-                    self.pheromone_matrix.adjust_pheromone(
-                        (CityIndex::new(x), CityIndex::new(y)),
-                        if delta > min_tau { delta } else { min_tau },
-                    );
-                }
-            }
-
-            delta_tau_matrix.fill(0.0);
             // Keep track of the shortest tour.
-            if short.tour_length < self.best_tour.length() {
-                self.best_tour = self.ants[short.ant_idx].clone_tour(self.tsp_problem.distances());
+            if iteration_tours.short_tour_length < self.best_tour.length() {
+                self.best_tour = self.ants[iteration_tours.short_tour_ant_idx]
+                    .clone_tour(self.tsp_problem.distances());
                 dbg!(self.iteration, self.best_tour.length());
             }
 
@@ -207,59 +167,24 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
                 break;
             }
 
-            // TODO: use all_gather_into for actual information exchange:
-            // first, all processors exchange info on the routes of their best routes so far
-            // then, each processor chooses with which processor to exchange info and does it
-            // Leave one extra space in the buffer for each tour, because tour length
-            // will be appended to them.
-            let world_size = self.mpi.world_size as usize;
-            self.best_tour.hack_append_length_at_tour_end();
-            self.best_tour.hack_append_mpi_rank(self.mpi.rank);
-            let mut recv_buf =
-                vec![CityIndex::new(0); world_size * self.best_tour.number_of_cities() as usize];
-            self.mpi
-                .world
-                .all_gather_into(self.best_tour.cities(), &mut recv_buf);
-            self.best_tour.remove_hack_mpi_rank();
-            self.best_tour.remove_hack_length();
-            // if self.mpi.is_root {
-            //     for i in 0..self.mpi.world_size {
-            //         eprintln!(
-            //             "{:?}",
-            //             &recv_buf[(i as usize * (self.number_of_cities() + 1)) as usize
-            //                 ..((i + 1) as usize * (self.number_of_cities() + 1)) as usize]
-            //         );
-            //     }
-            // }
-            let mut similarities = Vec::with_capacity(world_size);
-            for one_proc_best_tour_with_hacks_appended in recv_buf.chunks_exact(num_cities + 4) {
-                let dist = self
-                    .best_tour
-                    .distance(&one_proc_best_tour_with_hacks_appended[..num_cities]);
-                // Find distance calculation needs to ignore the appended length and rank.
-                similarities.push((
-                    dist,
-                    one_proc_best_tour_with_hacks_appended.get_hack_mpi_rank(),
-                    one_proc_best_tour_with_hacks_appended[..(num_cities + 2)]
-                        .get_hack_tour_length_from_last_element(),
-                ));
-            }
-            similarities.sort_unstable();
+            self.exchange_best_tours(&mut cpus_best_tours_buf);
+            // We can't use a matrix since the order of buffers from different CPUs is not
+            // guranteed.
+            let fitness =
+                self.calculate_proc_distances_fitness(&cpus_best_tours_buf, &mut proc_distances);
             if self.mpi.is_root {
-                dbg!(&similarities);
+                dbg!(&proc_distances);
             }
-            // First item in the sorted list will be this cpu, since the distance to oneself is 0.
-            let neighbour: Float = similarities
-                .iter()
-                .skip(1)
-                .take(self.lowercase_q.into())
-                .copied()
-                .map(|(dist, rank, length)| dist)
-                .sum::<u16>() as Float
-                / self.lowercase_q as Float;
 
             // TODO: choose exchange partner and perform exchange
             // to do this, we will need to calculate neighbour values for all other CPUs
+            let neighbour_values = self.calculate_neighbour_values(&mut proc_distances);
+            self.select_exchange_partner(
+                &fitness,
+                &neighbour_values,
+                &mut cpu_random_order,
+                &distrib01,
+            );
 
             if stale {
                 println!(
@@ -302,4 +227,193 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
     pub fn set_lowercase_q(&mut self, q: u16) {
         self.lowercase_q = q;
     }
+
+    fn exchange_best_tours(&mut self, recv_buf: &mut [CityIndex]) {
+        // self.best_tour.hack_append_length(self.mpi.rank);
+        self.best_tour.hack_append_length();
+        self.mpi
+            .world
+            .all_gather_into(self.best_tour.cities(), recv_buf);
+        self.best_tour.remove_hack_length();
+    }
+
+    fn construct_ant_tours(&mut self, distrib01: &Uniform<Float>) -> ShortLongIterationTours {
+        let mut iteration_tours = ShortLongIterationTours {
+            short_tour_ant_idx: 0,
+            short_tour_length: u32::MAX,
+            long_tour_length: 0,
+        };
+        let num_cities = self.number_of_cities() as usize;
+
+        // Colony is stale if all ants find the same tour. Since actually
+        // checking if tours match is expensive, we only check if they are
+        // of the same length.
+        for (idx, ant) in self.ants.iter_mut().enumerate() {
+            for _ in 1..num_cities {
+                ant.choose_next_city(self.rng, distrib01, &self.pheromone_matrix, self.alpha);
+            }
+
+            let len = ant.tour_length(self.tsp_problem.distances());
+
+            if len < iteration_tours.short_tour_length {
+                iteration_tours.short_tour_ant_idx = idx;
+                iteration_tours.short_tour_length = len;
+            }
+            if len > iteration_tours.long_tour_length {
+                iteration_tours.long_tour_length = len;
+            }
+        }
+
+        iteration_tours
+    }
+
+    fn update_pheromone(
+        &mut self,
+        mut delta_tau_matrix: &mut SquareMatrix<Float>,
+        iteration_tours: &ShortLongIterationTours,
+    ) {
+        self.pheromone_matrix.evaporate_pheromone();
+
+        let capital_q = self.capital_q_mul * iteration_tours.long_tour_length as Float;
+        // TODO: figure out if this should be calculated using best length so far or only from this iteration.
+        let min_tau = capital_q / iteration_tours.short_tour_length as f32;
+
+        for ant in self.ants.iter() {
+            ant.update_pheromone(delta_tau_matrix, self.capital_q_mul);
+        }
+
+        for x in 0..self.number_of_cities() {
+            for y in 0..x {
+                let delta = delta_tau_matrix[(x.into(), y.into())];
+                self.pheromone_matrix.adjust_pheromone(
+                    (CityIndex::new(x), CityIndex::new(y)),
+                    if delta > min_tau { delta } else { min_tau },
+                );
+            }
+        }
+
+        delta_tau_matrix.fill(0.0);
+    }
+
+    // Since MPI all_gather_into() places buffers from different CPUs in rank order,
+    // we don't need to exchange rank info.
+    fn calculate_proc_distances_fitness(
+        &self,
+        cpus_best_tours_buf: &[CityIndex],
+        proc_distances: &mut SquareMatrix<u16>,
+    ) -> Vec<Float> {
+        let num_cities = self.number_of_cities() as usize;
+        let mut fitness_scores = Vec::with_capacity(num_cities);
+        for (x, best_tour_with_hacks_appended_1) in cpus_best_tours_buf
+            .chunks_exact(num_cities + Tour::APPENDED_HACK_ELEMENTS)
+            .enumerate()
+        {
+            fitness_scores
+                .push(self.fitness(best_tour_with_hacks_appended_1.get_hack_tour_length()));
+            // let cpu1 = CpuInfo {
+            // rank: best_tour_with_hacks_appended_1.get_hack_mpi_rank(),
+            // best_tour_length: best_tour_with_hacks_appended_1.get_hack_tour_length(),
+            // };
+            for (y, best_tour_with_hacks_appended_2) in cpus_best_tours_buf
+                .chunks_exact(num_cities + Tour::APPENDED_HACK_ELEMENTS)
+                .take(x)
+                .enumerate()
+            {
+                // let cpu2 = CpuInfo {
+                // rank: best_tour_with_hacks_appended_2.get_hack_mpi_rank(),
+                // best_tour_length: best_tour_with_hacks_appended_2.get_hack_tour_length(),
+                // };
+                let distance = best_tour_with_hacks_appended_1
+                    .distance(&best_tour_with_hacks_appended_2[..num_cities]);
+                proc_distances[(x, y)] = distance;
+                proc_distances[(y, x)] = distance;
+                // Distance calculation needs to ignore the appended length and rank.
+                // proc_distances.push(CpuDistance {
+                // cpu1,
+                // cpu2,
+                // distance,
+                // });
+            }
+        }
+
+        fitness_scores
+    }
+
+    fn fitness(&self, tour_length: u32) -> Float {
+        let optimal = self.tsp_problem.solution_length();
+        optimal as Float / tour_length as Float
+    }
+
+    fn calculate_neighbour_values(&self, proc_distances: &mut SquareMatrix<u16>) -> Vec<Float> {
+        let world_size = self.mpi.world_size as usize;
+        let mut neighbour_values = Vec::with_capacity(world_size);
+        for y in 0..world_size {
+            let mut row = proc_distances.row_mut(y);
+            row.sort_unstable();
+
+            // First element is going to be 0 since it is distance to self.
+            let neighbour: Float =
+                row[1..].iter().sum::<u16>() as Float / self.lowercase_q as Float;
+            neighbour_values.push(neighbour);
+        }
+
+        neighbour_values
+    }
+
+    // Returns rank of the chosen CPU.
+    fn select_exchange_partner(
+        &mut self,
+        fitness: &[Float],
+        neighbour_values: &[Float],
+        cpu_random_order: &mut [usize],
+        distrib01: &Uniform<Float>,
+    ) -> usize {
+        let rank = self.mpi.rank as usize;
+        let mut denominator = 0.0;
+        let self_neighbour = neighbour_values[rank];
+        for i in 0..neighbour_values.len() {
+            if i == rank {
+                continue;
+            }
+            denominator += Float::abs(self_neighbour - neighbour_values[i]) * fitness[i];
+        }
+
+        cpu_random_order.shuffle(self.rng);
+        for i in cpu_random_order.iter().copied() {
+            let numerator = Float::abs(self_neighbour - neighbour_values[i]) * fitness[i];
+            let p = numerator / denominator;
+            if p > distrib01.sample(self.rng) {
+                return i;
+            }
+        }
+
+        // If no CPU is selected, choose a random one.
+        cpu_random_order[0]
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ShortLongIterationTours {
+    short_tour_ant_idx: usize,
+    short_tour_length: u32,
+    long_tour_length: u32,
+}
+
+impl ShortLongIterationTours {
+    fn is_colony_stale(&self) -> bool {
+        self.short_tour_length == self.long_tour_length
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+struct CpuInfo {
+    // rank: i32,
+    best_tour_length: u32,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+struct CpuDistance {
+    cpu1: CpuInfo,
+    cpu2: CpuInfo,
+    distance: u16,
 }
