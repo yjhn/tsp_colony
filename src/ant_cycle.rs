@@ -142,8 +142,8 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             // TODO: gal precomputint pheromone.powf(alpha)? Vis tiek jis keičiasi tik kitoje iteracijoje.
             // Each ant constructs a tour, keep track of the shortest and longest tours
             // found in this iteration.
-            let mut iteration_tours = self.construct_ant_tours(&distrib01);
-            let stale = iteration_tours.short_tour_length == iteration_tours.long_tour_length;
+            let iteration_tours = self.construct_ant_tours(&distrib01);
+            let stale = iteration_tours.is_colony_stale();
 
             // Update pheromone.
             self.update_pheromone(&mut delta_tau_matrix, &iteration_tours);
@@ -339,6 +339,7 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         fitness_scores
     }
 
+    // TODO: what fitness function to use is not specified in the paper, maybe it does not matter?
     fn fitness(&self, tour_length: u32) -> Float {
         let optimal = self.tsp_problem.solution_length();
         optimal as Float / tour_length as Float
@@ -403,17 +404,4 @@ impl ShortLongIterationTours {
     fn is_colony_stale(&self) -> bool {
         self.short_tour_length == self.long_tour_length
     }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-struct CpuInfo {
-    // rank: i32,
-    best_tour_length: u32,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-struct CpuDistance {
-    cpu1: CpuInfo,
-    cpu2: CpuInfo,
-    distance: u16,
 }
