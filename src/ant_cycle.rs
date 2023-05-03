@@ -172,19 +172,19 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             // guranteed.
             let fitness =
                 self.calculate_proc_distances_fitness(&cpus_best_tours_buf, &mut proc_distances);
-            if self.mpi.is_root {
-                dbg!(&proc_distances);
-            }
 
             // TODO: choose exchange partner and perform exchange
             // to do this, we will need to calculate neighbour values for all other CPUs
             let neighbour_values = self.calculate_neighbour_values(&mut proc_distances);
-            self.select_exchange_partner(
+            let exchange_partner = self.select_exchange_partner(
                 &fitness,
                 &neighbour_values,
                 &mut cpu_random_order,
                 &distrib01,
             );
+            if self.mpi.is_root {
+                dbg!(&proc_distances);
+            }
 
             if stale {
                 println!(
@@ -323,7 +323,7 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
                 // rank: best_tour_with_hacks_appended_2.get_hack_mpi_rank(),
                 // best_tour_length: best_tour_with_hacks_appended_2.get_hack_tour_length(),
                 // };
-                let distance = best_tour_with_hacks_appended_1
+                let distance = best_tour_with_hacks_appended_1[..num_cities]
                     .distance(&best_tour_with_hacks_appended_2[..num_cities]);
                 proc_distances[(x, y)] = distance;
                 proc_distances[(y, x)] = distance;

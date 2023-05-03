@@ -13,6 +13,8 @@ mod tsp_problem;
 mod tsplib;
 mod utils;
 
+use std::process;
+
 use crate::{
     arguments::{Args, PopulationSizes},
     benchmark::benchmark_ant_cycle,
@@ -27,8 +29,32 @@ use mpi::{
 // Run using:
 // cargo build --release && RUST_BACKTRACE=1 mpirun -c 1 --use-hwthread-cpus --mca opal_warn_on_missing_libcuda 0 target/release/tsp_colony --dup switch-name --alphas 1 --betas 5 --ros 0.5 --qs 100 -f data/eil101.tsp 1>/dev/null
 fn main() {
-    let args = arguments::Args::parse();
-    eprintln!("Supplied arguments: {args:#?}");
+    // Initialize MPI.
+    const MPI_ROOT_RANK: i32 = 0;
+    let universe = mpi::initialize().unwrap();
+    let world = universe.world();
+    let world_size = world.size();
+    let rank = world.rank();
+    let root_process = world.process_at_rank(MPI_ROOT_RANK);
+    let is_root = rank == MPI_ROOT_RANK;
+    let mpi = Mpi {
+        universe,
+        world,
+        world_size,
+        root_process,
+        rank,
+        is_root: rank == MPI_ROOT_RANK,
+    };
+    let args = if mpi.is_root {
+        let args = arguments::Args::try_parse().unwrap_or_else(|e| {
+            eprintln!("Error parsing arguments: {}", e);
+            mpi.world.abort(2)
+        });
+        eprintln!("Supplied arguments: {args:#?}");
+        args
+    } else {
+        arguments::Args::try_parse().unwrap_or_else(|_e| process::exit(2))
+    };
 
     let alphas = args.alphas.unwrap_or_else(|| vec![config::ALPHA]);
     let betas = args.betas.unwrap_or_else(|| vec![config::BETA]);
@@ -47,23 +73,6 @@ fn main() {
         PopulationSizes::Custom(popsizes)
     } else {
         PopulationSizes::SameAsCityCount
-    };
-
-    // Initialize MPI.
-    const MPI_ROOT_RANK: i32 = 0;
-    let universe = mpi::initialize().unwrap();
-    let world = universe.world();
-    let world_size = world.size();
-    let rank = world.rank();
-    let root_process = world.process_at_rank(MPI_ROOT_RANK);
-    let is_root = rank == MPI_ROOT_RANK;
-    let mpi = Mpi {
-        universe,
-        world,
-        world_size,
-        root_process,
-        rank,
-        is_root: rank == MPI_ROOT_RANK,
     };
 
     benchmark_ant_cycle::<_, config::RNG>(
