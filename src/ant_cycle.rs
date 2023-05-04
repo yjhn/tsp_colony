@@ -34,6 +34,8 @@ pub struct AntCycle<'a, R: Rng + SeedableRng> {
     capital_q_mul: Float,
     initial_trail_intensity: Float,
     lowercase_q: u16,
+    g: u32,
+    k: u32,
     mpi: &'a Mpi<'a>,
     cities_distrib: Uniform<u16>,
 }
@@ -49,6 +51,8 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         capital_q_mul: Float,
         ro: Float,
         lowercase_q: u16,
+        init_g: u32,
+        k: u32,
         mpi: &'a Mpi,
     ) -> AntCycle<'a, R> {
         let city_count = tsp_problem.number_of_cities() as u16;
@@ -83,6 +87,8 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             capital_q_mul,
             initial_trail_intensity,
             lowercase_q,
+            g: init_g,
+            k,
             mpi,
             cities_distrib: distributions::Uniform::new(0, city_count).unwrap(),
         }
@@ -98,6 +104,14 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
 
     pub fn set_ro(&mut self, ro: Float) {
         self.pheromone_matrix.set_ro(ro);
+    }
+
+    pub fn set_g(&mut self, g: u32) {
+        self.g = g;
+    }
+
+    pub fn set_k(&mut self, k: u32) {
+        self.k = k;
     }
 
     /// Resets pheromone intensity to `intensity`.
@@ -138,6 +152,7 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             vec![CityIndex::new(0); world_size * (num_cities + Tour::APPENDED_HACK_ELEMENTS)];
         let mut proc_distances = SquareMatrix::new(world_size, 0);
         // let mut min_delta_tau = config::MIN_DELTA_TAU_INIT;
+        let mut last_exchange = self.iteration;
 
         loop {
             // TODO: gal precomputint pheromone.powf(alpha)? Vis tiek jis keičiasi tik kitoje iteracijoje.
@@ -174,8 +189,11 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
                 min_delta_tau,
             );
             //TODO: exchange at time interval, not at every iteration.
-            if todo!("exchange at time intervals") {
+            if self.iteration - last_exchange == self.g {
                 self.exchange_best_tours(&mut cpus_best_tours_buf);
+                last_exchange = self.iteration;
+                let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
+                self.set_exchange_interval(cvg_avg);
                 // We can't use a matrix since the order of buffers from different CPUs is not
                 // guranteed.
                 let (fitness, shortest_tour_so_far) = self
@@ -204,7 +222,6 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
                     min_delta_tau,
                     capital_q,
                 );
-            } else {
             }
 
             if iteration_tours.is_colony_stale() {
@@ -250,12 +267,13 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
     }
 
     fn exchange_best_tours(&mut self, recv_buf: &mut [CityIndex]) {
+        let cvg = self.calculate_cvg();
         // self.best_tour.hack_append_length(self.mpi.rank);
-        self.best_tour.hack_append_length();
+        self.best_tour.hack_append_length_cvg(cvg);
         self.mpi
             .world
             .all_gather_into(self.best_tour.cities(), recv_buf);
-        self.best_tour.remove_hack_length();
+        self.best_tour.remove_hack_length_cvg();
     }
 
     fn construct_ant_tours(&mut self, distrib01: &Uniform<Float>) -> ShortLongIterationTours {
@@ -382,8 +400,9 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             row.sort_unstable();
 
             // First element is going to be 0 since it is distance to self.
-            let neighbour: Float =
-                row[1..].iter().sum::<u16>() as Float / self.lowercase_q as Float;
+            let neighbour: Float = row[1..].iter().take(self.lowercase_q as usize).sum::<u16>()
+                as Float
+                / self.lowercase_q as Float;
             neighbour_values.push(neighbour);
         }
 
@@ -433,7 +452,7 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         capital_q: Float,
     ) {
         // evaporation is probably unneccessary here?
-        // self.pheromone_matrix.evaporate_pheromone();
+        self.pheromone_matrix.evaporate_pheromone();
         // Formula 7 in the PACO paper.
         let fit_gh = self_fitness / (self_fitness + partner_fitness);
         let delta_tau_g = capital_q / self.best_tour.length() as Float;
@@ -465,6 +484,32 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         }
 
         delta_tau_matrix.fill(0.0);
+    }
+
+    fn calculate_cvg(&self) -> Float {
+        let (max_pher, avg_pher) = self.pheromone_matrix.max_avg_pheromone();
+
+        let first = 1.0 / (self.number_of_cities() as Float * (max_pher - avg_pher));
+
+        let sum_diff_pher = self.pheromone_matrix.sum_diff_pher(avg_pher);
+
+        first * sum_diff_pher
+    }
+
+    fn cvg_avg(&self, cpus_best_tours_buf: &[CityIndex]) -> Float {
+        let cvg_sum: Float = cpus_best_tours_buf
+            .chunks_exact(self.number_of_cities())
+            .map(|tour_with_hacks| tour_with_hacks.get_hack_cvg())
+            .sum();
+
+        cvg_sum / self.mpi.world_size as Float
+    }
+
+    fn set_exchange_interval(&mut self, cvg_avg: Float) {
+        if cvg_avg >= 0.8 || cvg_avg <= 0.2 {
+            let new_g = self.g as Float + (0.5 - cvg_avg) * self.k as Float;
+            self.g = max(new_g as u32, 1);
+        }
     }
 }
 

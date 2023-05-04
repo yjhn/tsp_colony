@@ -1,6 +1,7 @@
 use crate::config::Float;
 use crate::distance_matrix::DistanceMatrix;
 use crate::matrix::SquareMatrix;
+use crate::static_assert;
 use crate::utils::all_cities;
 use crate::utils::order;
 use crate::utils::reverse_order;
@@ -27,6 +28,10 @@ pub struct CityIndex(u16);
 impl CityIndex {
     pub fn new(index: u16) -> CityIndex {
         CityIndex(index)
+    }
+
+    pub fn from_be_bytes(b1: u8, b2: u8) -> CityIndex {
+        CityIndex::new(u16::from_be_bytes([b1, b2]))
     }
 }
 
@@ -68,11 +73,15 @@ pub struct Tour {
     tour_length: u32,
 }
 
+// This disallows using f64 for Float.
+static_assert!(size_of::<Float>() == 2 * size_of::<CityIndex>());
+
 impl Tour {
     // How many elements are appended using hack methods for tour exchange.
     // We append delta_tau and tour length.
     // pub const APPENDED_HACK_ELEMENTS: usize = size_of::<Float>() / 2 + 2;
-    pub const APPENDED_HACK_ELEMENTS: usize = size_of::<CityIndex>();
+    pub const APPENDED_HACK_ELEMENTS: usize =
+        size_of::<u32>() / size_of::<CityIndex>() + size_of::<Float>() / size_of::<CityIndex>();
 
     pub const PLACEHOLDER: Tour = Tour {
         cities: Vec::new(),
@@ -100,22 +109,22 @@ impl Tour {
         }
     }
 
-    pub fn from_hack_cities(mut cities_with_length: Vec<CityIndex>) -> Tour {
-        // Length is stored as two CityIndex'es in big endian order (i. e. u16 at [end]
-        // is the lower end and u16 at [end - 1] is the higher end)
-        let tour_length_part_1: u16 = cities_with_length.pop().unwrap().into();
-        let tour_length_part_2: u16 = cities_with_length.pop().unwrap().into();
-        let [b3, b4] = tour_length_part_1.to_be_bytes();
-        let [b1, b2] = tour_length_part_2.to_be_bytes();
-        let tour_length = u32::from_be_bytes([b1, b2, b3, b4]);
-        // Cities don't contain length anymore.
-        let cities = cities_with_length;
+    // pub fn from_hack_cities(mut cities_with_length: Vec<CityIndex>) -> Tour {
+    //     // Length is stored as two CityIndex'es in big endian order (i. e. u16 at [end]
+    //     // is the lower end and u16 at [end - 1] is the higher end)
+    //     let tour_length_part_1: u16 = cities_with_length.pop().unwrap().into();
+    //     let tour_length_part_2: u16 = cities_with_length.pop().unwrap().into();
+    //     let [b3, b4] = tour_length_part_1.to_be_bytes();
+    //     let [b1, b2] = tour_length_part_2.to_be_bytes();
+    //     let tour_length = u32::from_be_bytes([b1, b2, b3, b4]);
+    //     // Cities don't contain length anymore.
+    //     let cities = cities_with_length;
 
-        Tour {
-            cities,
-            tour_length,
-        }
-    }
+    //     Tour {
+    //         cities,
+    //         tour_length,
+    //     }
+    // }
 
     pub fn random(city_count: u16, distances: &DistanceMatrix, rng: &mut impl Rng) -> Tour {
         assert!(city_count > 1);
@@ -165,7 +174,7 @@ impl Tour {
         self.cities.windows(2)
     }
 
-    /// Creates a new `Tour` by cloning the provided slice. Trusts that the `length`
+    /// Creates a new `Tour` by cloning the provided slice. Trusts that `length`
     /// is correct.
     pub fn clone_from_cities(tour: &[CityIndex], length: u32, distances: &DistanceMatrix) -> Tour {
         debug_assert_eq!(length, tour.calculate_tour_length(distances));
@@ -189,14 +198,15 @@ impl Tour {
     // This function call must be matched by the corresponding
     // call to remove_hack_length_and_mpi_rank().
     // pub fn hack_append_length_and_mpi_rank(&mut self, rank: i32) {
-    pub fn hack_append_length(&mut self) {
+    pub fn hack_append_length_cvg(&mut self, cvg: Float) {
         // Tour length.
         let [b1, b2, b3, b4] = self.tour_length.to_be_bytes();
-        self.cities
-            .push(CityIndex::new(u16::from_be_bytes([b1, b2])));
-        self.cities
-            .push(CityIndex::new(u16::from_be_bytes([b3, b4])));
+        self.cities.push(CityIndex::from_be_bytes(b1, b2));
+        self.cities.push(CityIndex::from_be_bytes(b3, b4));
 
+        let [cb1, cb2, cb3, cb4] = cvg.to_be_bytes();
+        self.cities.push(CityIndex::from_be_bytes(cb1, cb2));
+        self.cities.push(CityIndex::from_be_bytes(cb3, cb4));
         // MPI rank.
         // let [b1, b2, b3, b4] = rank.to_be_bytes();
         // self.cities
@@ -206,11 +216,10 @@ impl Tour {
     }
 
     // pub fn remove_hack_length_and_mpi_rank(&mut self) {
-    pub fn remove_hack_length(&mut self) {
-        // self.cities.pop();
-        // self.cities.pop();
-        self.cities.pop();
-        self.cities.pop();
+    pub fn remove_hack_length_cvg(&mut self) {
+        for _ in 0..Self::APPENDED_HACK_ELEMENTS {
+            self.cities.pop();
+        }
     }
 }
 
@@ -218,6 +227,8 @@ pub trait TourFunctions {
     fn calculate_tour_length(&self, distances: &DistanceMatrix) -> u32;
 
     fn get_hack_tour_length(&self) -> u32;
+
+    fn get_hack_cvg(&self) -> Float;
 
     fn paths(&self) -> Windows<CityIndex>;
 
@@ -235,8 +246,8 @@ impl TourFunctions for [CityIndex] {
         assert!(self.len() > 1);
 
         let mut tour_length = 0;
-        for idx in 0..(self.len() - 1) {
-            tour_length += distances[(self[idx], self[idx + 1])];
+        for pair in self.paths() {
+            tour_length += distances[(pair[0], pair[1])];
         }
         // Add distance from last to first.
         tour_length += distances[(*self.last().unwrap(), self[0])];
@@ -248,10 +259,10 @@ impl TourFunctions for [CityIndex] {
     fn get_hack_tour_length(&self) -> u32 {
         // Length is stored as two CityIndex'es in big endian order (i. e. u16 at [end]
         // is the lower end and u16 at [end - 1] is the higher end)
-        // let tour_length_part_1: u16 = self[self.len() - 3].into();
-        // let tour_length_part_2: u16 = self[self.len() - 4].into();
-        let tour_length_part_1: u16 = self[self.len() - 1].into();
-        let tour_length_part_2: u16 = self[self.len() - 2].into();
+        let tour_length_part_1: u16 = self[self.len() - 3].into();
+        let tour_length_part_2: u16 = self[self.len() - 4].into();
+        // let tour_length_part_1: u16 = self[self.len() - 1].into();
+        // let tour_length_part_2: u16 = self[self.len() - 2].into();
         let [b3, b4] = tour_length_part_1.to_be_bytes();
         let [b1, b2] = tour_length_part_2.to_be_bytes();
         u32::from_be_bytes([b1, b2, b3, b4])
@@ -303,5 +314,15 @@ impl TourFunctions for [CityIndex] {
         }
         // Last path.
         delta_tau_matrix[reverse_order(self[0].into(), self.last().unwrap().into())] += delta_tau;
+    }
+
+    fn get_hack_cvg(&self) -> Float {
+        // Length is stored as two CityIndex'es in big endian order (i. e. u16 at [end]
+        // is the lower end and u16 at [end - 1] is the higher end)
+        let cvg_part_1: u16 = self[self.len() - 1].into();
+        let cvg_part_2: u16 = self[self.len() - 2].into();
+        let [b3, b4] = cvg_part_1.to_be_bytes();
+        let [b1, b2] = cvg_part_2.to_be_bytes();
+        Float::from_be_bytes([b1, b2, b3, b4])
     }
 }

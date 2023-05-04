@@ -42,6 +42,12 @@ pub struct Args {
     #[arg(long, num_args(1..))]
     pub lowercase_qs: Option<Vec<u16>>,
 
+    #[arg(long, num_args(1..))]
+    pub init_gs: Option<Vec<u32>>,
+
+    #[arg(long, num_args(1..))]
+    pub ks: Option<Vec<u32>>,
+
     #[arg(short, long, default_value_t = config::MAX_ITERATIONS)]
     /// Maximum number of generations for obtaining the optimal solution.
     pub max_iterations: u32,

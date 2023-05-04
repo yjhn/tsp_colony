@@ -66,3 +66,17 @@ pub struct Mpi<'a> {
     pub rank: i32,
     pub is_root: bool,
 }
+
+#[macro_export]
+macro_rules! static_assert {
+    ($cond:expr) => {
+        $crate::static_assert!($cond, concat!("assertion failed: ", stringify!($cond)));
+    };
+    ($cond:expr, $($t:tt)+) => {
+        const _: () = {
+            if !$cond {
+                panic!($($t)+)
+            }
+        };
+    };
+}

@@ -34,6 +34,36 @@ impl PheromoneVisibilityMatrix {
         PheromoneVisibilityMatrix { matrix, ro }
     }
 
+    pub fn max_avg_pheromone(&self) -> (Float, Float) {
+        let mut max = 0.0;
+        let mut avg = 0.0;
+
+        for x in 0..self.side_length() {
+            for y in 0..x {
+                let val = self.matrix[(x, y)];
+                if val > max {
+                    max = val;
+                }
+                avg += val;
+            }
+        }
+        avg /= self.side_length() as Float;
+
+        (max, avg)
+    }
+
+    /// Sums the absolute pheromone differences to `val`.
+    pub fn sum_diff_pher(&self, val: Float) -> Float {
+        let mut diff = 0.0;
+        for x in 0..self.side_length() {
+            for y in 0..x {
+                diff += Float::abs(self.matrix[(x, y)] - val);
+            }
+        }
+
+        diff
+    }
+
     pub fn side_length(&self) -> usize {
         self.matrix.side_length()
     }

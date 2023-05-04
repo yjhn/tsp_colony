@@ -69,6 +69,9 @@ fn main() {
     let lowercase_qs = args
         .lowercase_qs
         .unwrap_or_else(|| vec![config::LOWERCASE_Q]);
+    let init_gs = args.init_gs.unwrap_or_else(|| vec![config::INIT_G]);
+    let ks = args.ks.unwrap_or_else(|| vec![config::K]);
+
     let population_sizes = if let Some(popsizes) = args.population_sizes {
         PopulationSizes::Custom(popsizes)
     } else {
@@ -87,6 +90,8 @@ fn main() {
         &capital_q_muls,
         &ros,
         &lowercase_qs,
+        &init_gs,
+        &ks,
         &init_intensities,
         &mpi,
     );
