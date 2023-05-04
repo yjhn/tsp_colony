@@ -36,6 +36,7 @@ pub struct PacoRunner<'a, R: Rng + SeedableRng> {
     capital_q_mul: Float,
     initial_trail_intensity: Float,
     lowercase_q: usize,
+    TODO: exchange generations always repeat with the same values: 6, 12, 18, 24, ... (6 is added after every exchange for some reason)
     g: u32,
     k: u32,
     mpi: &'a Mpi<'a>,
@@ -121,7 +122,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         self.pheromone_matrix.reset_pheromone(intensity);
     }
 
-    pub fn reset_all_state(&mut self) {
+    pub fn reset_all_state(&mut self, init_g: u32) {
         // Reset ants.
         let num_cities = self.number_of_cities() as u16;
         for a in self.ants.iter_mut() {
@@ -135,6 +136,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         self.best_tour = Tour::PLACEHOLDER;
         self.pheromone_matrix
             .reset_pheromone(self.initial_trail_intensity);
+        self.g = init_g;
     }
 
     pub fn iterate_until_optimal(&mut self, max_iterations: u32) -> bool {
@@ -536,6 +538,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
     fn set_exchange_interval(&mut self, cvg_avg: Float) {
         if cvg_avg >= 0.8 || cvg_avg <= 0.2 {
             let new_g = self.g as Float + (0.5 - cvg_avg) * self.k as Float;
+            debug_assert!(new_g >= 0.0);
             self.g = max(new_g as u32, 1);
         }
     }

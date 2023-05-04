@@ -226,7 +226,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                                                 if found_optimal_tour {
                                                     break;
                                                 }
-                                                ant_cycle.reset_all_state();
+                                                ant_cycle.reset_all_state(init_g);
                                             }
 
                                             let bench_duration = bench_start.elapsed();
