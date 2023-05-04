@@ -363,6 +363,9 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
             // rank: best_tour_with_hacks_appended_1.get_hack_mpi_rank(),
             // best_tour_length: best_tour_with_hacks_appended_1.get_hack_tour_length(),
             // };
+
+            // Since we are not setting distance to self (pointless), it gets corrupted
+            // when we sort the rows of the distance table.
             for (y, best_tour_with_hacks_appended_2) in cpus_best_tours_buf
                 .chunks_exact(chunk_size)
                 .take(x)
