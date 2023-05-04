@@ -57,13 +57,7 @@ impl Ant {
 
         // TODO: should Q/L_k be Q/L_l? (current implementation assumes it)
         let delta_tau = capital_q / self.tour_length as Float;
-        for path in self.tour.windows(2) {
-            let &[c1, c2] = path else { unreachable!() };
-            delta_tau_matrix[reverse_order(c1.into(), c2.into())] += delta_tau;
-        }
-        // Last path.
-        delta_tau_matrix[reverse_order(self.tour[0].into(), self.tour.last().unwrap().into())] +=
-            delta_tau;
+        self.tour.update_pheromone(delta_tau_matrix, delta_tau);
     }
 
     /// Calculates and caches tour length.

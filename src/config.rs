@@ -20,6 +20,8 @@ pub const INITIAL_TRAIL_INTENSITY: Float = 100.0;
 // q: how many most similar CPUs to take when calculating neighbour coefficient.
 pub const LOWERCASE_Q: u16 = 3;
 
+pub const MIN_DELTA_TAU_INIT: f32 = 5.0;
+
 // Benchmark repeat times.
 pub const REPEAT_TIMES: u32 = 10;
 // Benchmark results directory.

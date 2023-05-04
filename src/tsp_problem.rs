@@ -78,8 +78,8 @@ impl TspProblem {
         }
     }
 
-    pub fn number_of_cities(&self) -> u16 {
-        self.cities.len() as u16
+    pub fn number_of_cities(&self) -> usize {
+        self.cities.len()
     }
 
     pub fn distances(&self) -> &DistanceMatrix {

@@ -1,7 +1,9 @@
+use crate::config::Float;
 use crate::distance_matrix::DistanceMatrix;
 use crate::matrix::SquareMatrix;
 use crate::utils::all_cities;
 use crate::utils::order;
+use crate::utils::reverse_order;
 use mpi::traits::Equivalence;
 use rand::prelude::SliceRandom;
 use rand::Rng;
@@ -11,14 +13,14 @@ use std::fmt::Display;
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::Write;
+use std::mem::size_of;
 use std::path::Path;
 use std::slice::Windows;
 
 /// Index of the city in the city matrix.
 /// `u16` is enough since it is extremely unlikely that number of cities would be greater.
 // TODO: it would be enough to use u16 here instead of usize
-// #[repr(transparent)] is not needed hare as we do no transmutes and thus
-// do not rely on the exact layout of CityIndex.
+#[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Equivalence)]
 pub struct CityIndex(u16);
 
@@ -68,7 +70,9 @@ pub struct Tour {
 
 impl Tour {
     // How many elements are appended using hack methods for tour exchange.
-    pub const APPENDED_HACK_ELEMENTS: usize = 2;
+    // We append delta_tau and tour length.
+    // pub const APPENDED_HACK_ELEMENTS: usize = size_of::<Float>() / 2 + 2;
+    pub const APPENDED_HACK_ELEMENTS: usize = size_of::<CityIndex>();
 
     pub const PLACEHOLDER: Tour = Tour {
         cities: Vec::new(),
@@ -222,6 +226,8 @@ pub trait TourFunctions {
     fn distance(&self, other: &[CityIndex]) -> u16;
 
     // fn get_hack_mpi_rank(&self) -> i32;
+
+    fn update_pheromone(&self, delta_tau_matrix: &mut SquareMatrix<Float>, delta_tau: Float);
 }
 
 impl TourFunctions for [CityIndex] {
@@ -289,4 +295,13 @@ impl TourFunctions for [CityIndex] {
     //     let [b1, b2] = rank_part_2.to_be_bytes();
     //     i32::from_be_bytes([b1, b2, b3, b4])
     // }
+
+    fn update_pheromone(&self, delta_tau_matrix: &mut SquareMatrix<Float>, delta_tau: Float) {
+        for path in self.windows(2) {
+            let &[c1, c2] = path else { unreachable!() };
+            delta_tau_matrix[reverse_order(c1.into(), c2.into())] += delta_tau;
+        }
+        // Last path.
+        delta_tau_matrix[reverse_order(self[0].into(), self.last().unwrap().into())] += delta_tau;
+    }
 }

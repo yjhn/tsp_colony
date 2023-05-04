@@ -1,3 +1,4 @@
+use crate::config::Float;
 use crate::tour::CityIndex;
 use mpi::environment::Universe;
 use mpi::{
@@ -20,6 +21,14 @@ pub fn reverse_order<T: Ord>(a: T, b: T) -> (T, T) {
         (a, b)
     } else {
         (b, a)
+    }
+}
+
+pub fn maxf(x: Float, y: Float) -> Float {
+    if x > y {
+        x
+    } else {
+        y
     }
 }
 
