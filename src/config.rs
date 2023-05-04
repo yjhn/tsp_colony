@@ -18,7 +18,7 @@ pub const MAX_ITERATIONS: u32 = 5000;
 // Initial intensity of all trails.
 pub const INITIAL_TRAIL_INTENSITY: Float = 100.0;
 // q: how many most similar CPUs to take when calculating neighbour coefficient.
-pub const LOWERCASE_Q: u16 = 3;
+pub const LOWERCASE_Q: usize = 3;
 
 pub const INIT_G: u32 = 1;
 

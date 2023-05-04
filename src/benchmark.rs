@@ -20,8 +20,11 @@ struct AntCycleConstants {
     population_size: u32,
     alpha: Float,
     beta: Float,
-    q: Float,
+    capital_q_mul: Float,
     ro: Float,
+    lowercase_q: usize,
+    init_g: u32,
+    k: u32,
     init_intensity: Float,
 }
 
@@ -68,9 +71,9 @@ pub fn benchmark_ant_cycle<PD, R>(
     results_dir: &str,
     alphas: &[Float],
     betas: &[Float],
-    qs: &[Float],
+    capital_q_multipliers: &[Float],
     ros: &[Float],
-    lowercase_qs: &[u16],
+    lowercase_qs: &[usize],
     init_gs: &[u32],
     ks: &[u32],
     init_intensities: &[Float],
@@ -115,7 +118,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                     for &alpha in alphas {
                         ant_cycle.set_alpha(alpha);
 
-                        for &q in qs {
+                        for &q in capital_q_multipliers {
                             ant_cycle.set_capital_q_mul(q);
 
                             for &ro in ros {
@@ -172,10 +175,13 @@ pub fn benchmark_ant_cycle<PD, R>(
                                                     population_size: p,
                                                     alpha,
                                                     beta,
-                                                    q,
+                                                    capital_q_mul: q,
                                                     ro,
                                                     max_iterations,
                                                     init_intensity: intense,
+                                                    lowercase_q,
+                                                    init_g,
+                                                    k,
                                                 },
                                                 repeat_times,
                                             };

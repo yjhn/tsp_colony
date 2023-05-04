@@ -40,7 +40,7 @@ pub struct Args {
     pub init_intensities: Option<Vec<Float>>,
 
     #[arg(long, num_args(1..))]
-    pub lowercase_qs: Option<Vec<u16>>,
+    pub lowercase_qs: Option<Vec<usize>>,
 
     #[arg(long, num_args(1..))]
     pub init_gs: Option<Vec<u32>>,

@@ -35,7 +35,7 @@ pub struct PacoRunner<'a, R: Rng + SeedableRng> {
     alpha: Float,
     capital_q_mul: Float,
     initial_trail_intensity: Float,
-    lowercase_q: u16,
+    lowercase_q: usize,
     g: u32,
     k: u32,
     mpi: &'a Mpi<'a>,
@@ -52,7 +52,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         beta: Float,
         capital_q_mul: Float,
         ro: Float,
-        lowercase_q: u16,
+        lowercase_q: usize,
         init_g: u32,
         k: u32,
         mpi: &'a Mpi,
@@ -166,20 +166,11 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
             if iteration_tours.short_tour_length < self.best_tour.length() {
                 self.best_tour = self.ants[iteration_tours.short_tour_ant_idx]
                     .clone_tour(self.tsp_problem.distances());
-                dbg!(self.iteration, self.best_tour.length());
+                // dbg!(self.iteration, self.best_tour.length());
             }
 
             self.iteration += 1;
             self.time += num_cities;
-
-            if self.best_tour.length() == self.tsp_problem.solution_length() {
-                println!(
-                    "Stopping, reached optimal length in iteration {}",
-                    self.iteration
-                );
-                found_optimal = true;
-                break;
-            }
 
             let capital_q = iteration_tours.long_tour_length as Float * self.capital_q_mul;
             let min_delta_tau = capital_q / iteration_tours.short_tour_length as Float;
@@ -196,6 +187,11 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 last_exchange = self.iteration;
                 let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
                 self.set_exchange_interval(cvg_avg);
+                let global_best_tour_length = self.global_best_tour_length(&cpus_best_tours_buf);
+                if global_best_tour_length == self.tsp_problem.solution_length() {
+                    found_optimal = true;
+                    break;
+                }
                 // We can't use a matrix since the order of buffers from different CPUs is not
                 // guranteed.
                 let (fitness, shortest_tour_so_far) = self
@@ -209,9 +205,9 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                     &mut cpu_random_order,
                     &distrib01,
                 );
-                if self.mpi.is_root {
-                    dbg!(&proc_distances);
-                }
+                // if self.mpi.is_root {
+                //     dbg!(&proc_distances);
+                // }
                 let best_partner_tour = &cpus_best_tours_buf[(exchange_partner
                     * (num_cities + Tour::APPENDED_HACK_ELEMENTS))
                     ..((exchange_partner + 1) * (num_cities + Tour::APPENDED_HACK_ELEMENTS))];
@@ -224,6 +220,20 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                     min_delta_tau,
                     capital_q,
                 );
+
+                if self.mpi.is_root {
+                    eprintln!(
+                        "Done an exchange on iteration {}, global best tour length {}, next exchange in {} iterations",
+                        self.iteration, global_best_tour_length, self.g
+                    );
+                }
+            } else if self.best_tour.length() == self.tsp_problem.solution_length() {
+                println!(
+                    "Stopping, reached optimal length in iteration {}",
+                    self.iteration
+                );
+                found_optimal = true;
+                break;
             }
 
             if iteration_tours.is_colony_stale() {
@@ -264,7 +274,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         &self.best_tour
     }
 
-    pub fn set_lowercase_q(&mut self, q: u16) {
+    pub fn set_lowercase_q(&mut self, q: usize) {
         self.lowercase_q = q;
     }
 
@@ -405,8 +415,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
             row.sort_unstable();
 
             // First element is going to be 0 since it is distance to self.
-            let neighbour: Float = row[1..].iter().take(self.lowercase_q as usize).sum::<u16>()
-                as Float
+            let neighbour: Float = row[1..].iter().take(self.lowercase_q).sum::<u16>() as Float
                 / self.lowercase_q as Float;
             neighbour_values.push(neighbour);
         }
@@ -494,7 +503,8 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
     fn calculate_cvg(&self) -> Float {
         let (max_pher, avg_pher) = self.pheromone_matrix.max_avg_pheromone();
 
-        let first = 1.0 / (self.number_of_cities() as Float * (max_pher - avg_pher));
+        let first = 1.0
+            / (self.pheromone_matrix.pheromone_element_count() as Float * (max_pher - avg_pher));
 
         let sum_diff_pher = self.pheromone_matrix.sum_diff_pher(avg_pher);
 
@@ -502,12 +512,25 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
     }
 
     fn cvg_avg(&self, cpus_best_tours_buf: &[CityIndex]) -> Float {
+        let chunk_size = self.number_of_cities() + Tour::APPENDED_HACK_ELEMENTS;
+        debug_assert_eq!(cpus_best_tours_buf.len() % chunk_size, 0);
+
         let cvg_sum: Float = cpus_best_tours_buf
-            .chunks_exact(self.number_of_cities())
+            .chunks_exact(chunk_size)
             .map(|tour_with_hacks| tour_with_hacks.get_hack_cvg())
             .sum();
 
         cvg_sum / self.mpi.world_size as Float
+    }
+
+    fn global_best_tour_length(&self, cpus_best_tours_buf: &[CityIndex]) -> u32 {
+        let chunk_size = self.number_of_cities() + Tour::APPENDED_HACK_ELEMENTS;
+
+        cpus_best_tours_buf
+            .chunks_exact(chunk_size)
+            .map(|tour_with_hacks| tour_with_hacks.get_hack_tour_length())
+            .max()
+            .unwrap()
     }
 
     fn set_exchange_interval(&mut self, cvg_avg: Float) {

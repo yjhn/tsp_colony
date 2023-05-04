@@ -47,9 +47,13 @@ impl PheromoneVisibilityMatrix {
                 avg += val;
             }
         }
-        avg /= self.side_length() as Float;
+        avg /= self.pheromone_element_count() as Float;
 
         (max, avg)
+    }
+
+    pub fn pheromone_element_count(&self) -> usize {
+        (self.side_length() * (self.side_length() - 1)) / 2
     }
 
     /// Sums the absolute pheromone differences to `val`.
