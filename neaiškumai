@@ -1,0 +1,22 @@
+Straipsnis:
+A parallel ant colony algorithm on massively parallel processors and
+its convergence analysis for the travelling salesman problem
+
+Neaiškumai:
+- Q daugiklis nenurodytas. Ir išvis, kas tiksliai yra Q? Parašyta, kad "konstanta", bet
+	tada rašo, kad tarp [L, 2*L], kur L - didžiausias maršruto ilgis?
+- kokia reikšme inicializuojama feromonų matrica?
+- ar apribojamos feromonų reikšmės tarp [0; 1]? (užsiminta, kad kažkas taip padarė ir gavo
+	geresnius rezultatus)
+- "L is the largest length of the solutions" - bendrai procesoriuje ar tik toje iteracijoje?
+- Ar L_k turėtų būti L_l (apie L_l parašyta, kas tas yr, o apie L_k nieko)
+- "L_{min} is the shortest length of the solutions" - vėlgi, ar bendrai procesoriuje, ar tik 
+	toje iteracijoje? O gal net globaliai (turbūt ne)?
+- Kaip skaičuojama fit_i? Daugiau - geriau, tai gal galima tiesiog 1/<best tour length>?
+- ar delta_tau_min skaičiuojamas pagal globaliai (tarp visų branduolių) trumpiausią maršrutą,
+	ar tik lokaliai trumpiausią? O gal išvis pagal optimalų maršrutą (bet negali taip būti, tada
+	daug kam netiktų, nes ne visų uždavinių optimalūs maršrutai žinomi) - tai gal tada jį
+	paskaičiuoti kai apsikeičiam geriausiais rastais maršrutais?
+- delta (g|h) ir delta_tau (g|h) maišomi kai kur (ypač kur atnaujinam feromonus pagal partnerį) 
+- ar reikia atnaujinant feromonus iš partnerio juos dar kartą evaporatint? (po kiekvienos
+	iteracijos jie evaporatinami ir taip)
