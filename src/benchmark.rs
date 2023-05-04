@@ -8,7 +8,7 @@ use mpi::traits::{Communicator, Root};
 use rand::{Rng, SeedableRng};
 use serde::Serialize;
 
-use crate::ant_cycle::AntCycle;
+use crate::ant_cycle::PacoRunner;
 use crate::arguments::{DuplicateHandling, PopulationSizes};
 use crate::config::Float;
 use crate::tsp_problem::TspProblem;
@@ -105,7 +105,7 @@ pub fn benchmark_ant_cycle<PD, R>(
             for &beta in betas {
                 // Construct the solver here, as nothing meaningfull will change in
                 // the inner loops.
-                let mut ant_cycle = AntCycle::new(
+                let mut ant_cycle = PacoRunner::new(
                     p as usize, &mut rng, &problem, 0.0, 0.0, beta, 0.0, 0.0, 0, 0, 0, mpi,
                 );
 

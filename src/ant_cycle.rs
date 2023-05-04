@@ -18,8 +18,10 @@ use crate::{
     utils::{maxf, Mpi},
 };
 
-/// Runs the ant cycle algorithm.
-pub struct AntCycle<'a, R: Rng + SeedableRng> {
+/// Runs the PACO algorithm as defined in paper:
+/// "A parallel ant colony algorithm on massively parallel processors and
+/// its convergence analysis for the travelling salesman problem"
+pub struct PacoRunner<'a, R: Rng + SeedableRng> {
     /// Current time. Increases by number of cities in each iteration.
     // TODO: maybe this is not needed?
     time: usize,
@@ -40,7 +42,7 @@ pub struct AntCycle<'a, R: Rng + SeedableRng> {
     cities_distrib: Uniform<u16>,
 }
 
-impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
+impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
     pub fn new(
         ant_count: usize,
         mut rng: &'a mut R,
@@ -54,7 +56,7 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
         init_g: u32,
         k: u32,
         mpi: &'a Mpi,
-    ) -> AntCycle<'a, R> {
+    ) -> PacoRunner<'a, R> {
         let city_count = tsp_problem.number_of_cities() as u16;
         let pheromone_matrix = PheromoneVisibilityMatrix::new(
             tsp_problem.number_of_cities(),
@@ -74,7 +76,7 @@ impl<'a, R: Rng + SeedableRng> AntCycle<'a, R> {
             ants.push(ant);
         }
 
-        AntCycle {
+        PacoRunner {
             time: 0,
             iteration: 0,
             ant_count,
