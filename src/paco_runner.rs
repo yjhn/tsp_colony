@@ -214,7 +214,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 }
                 let best_partner_tour = &cpus_best_tours_buf[(exchange_partner
                     * (num_cities + Tour::APPENDED_HACK_ELEMENTS))
-                    ..(exchange_partner * (num_cities + Tour::APPENDED_HACK_ELEMENTS))];
+                    ..((exchange_partner + 1) * (num_cities + Tour::APPENDED_HACK_ELEMENTS))];
                 self.update_pheromones_from_partner(
                     &best_partner_tour[..best_partner_tour.len() - Tour::APPENDED_HACK_ELEMENTS],
                     fitness[exchange_partner],

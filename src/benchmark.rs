@@ -8,9 +8,9 @@ use mpi::traits::{Communicator, Root};
 use rand::{Rng, SeedableRng};
 use serde::Serialize;
 
-use crate::ant_cycle::PacoRunner;
 use crate::arguments::{DuplicateHandling, PopulationSizes};
 use crate::config::Float;
+use crate::paco_runner::PacoRunner;
 use crate::tsp_problem::TspProblem;
 use crate::utils::{initialize_random_seed, Mpi};
 

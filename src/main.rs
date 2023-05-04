@@ -1,12 +1,12 @@
 #![allow(dead_code, unreachable_code, unused, clippy::too_many_arguments)]
 
 mod ant;
-mod ant_cycle;
 mod arguments;
 mod benchmark;
 mod config;
 mod distance_matrix;
 mod matrix;
+mod paco_runner;
 mod pheromone_visibility_matrix;
 mod tour;
 mod tsp_problem;
