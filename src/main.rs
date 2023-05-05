@@ -5,6 +5,7 @@ mod arguments;
 mod benchmark;
 mod config;
 mod distance_matrix;
+mod gstm;
 mod matrix;
 mod paco_runner;
 mod pheromone_visibility_matrix;
@@ -78,7 +79,7 @@ fn main() {
         PopulationSizes::SameAsCityCount
     };
 
-    benchmark_ant_cycle::<_, config::RNG>(
+    benchmark_ant_cycle::<_, config::MainRng>(
         &args.files,
         args.bench_repeat_times,
         population_sizes,

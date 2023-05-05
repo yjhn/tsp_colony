@@ -1,8 +1,11 @@
+use crate::config::Zeroable;
 use std::ops::Index;
 
-use crate::{matrix::SquareMatrix, tour::CityIndex};
-
-type DistanceT = u32;
+use crate::{
+    config::{DistanceT, Float},
+    matrix::SquareMatrix,
+    tour::CityIndex,
+};
 
 /// Distances are stored in the upper right corner.
 #[derive(Debug, Clone)]
@@ -10,7 +13,7 @@ pub struct DistanceMatrix(SquareMatrix<DistanceT>);
 
 impl DistanceMatrix {
     pub fn new(side_length: usize) -> DistanceMatrix {
-        DistanceMatrix(SquareMatrix::new(side_length, 0))
+        DistanceMatrix(SquareMatrix::new(side_length, DistanceT::ZERO))
     }
 
     pub fn side_length(&self) -> usize {

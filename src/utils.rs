@@ -75,7 +75,7 @@ macro_rules! static_assert {
     ($cond:expr, $($t:tt)+) => {
         const _: () = {
             if !$cond {
-                panic!($($t)+)
+                ::core::panic!($($t)+)
             }
         };
     };

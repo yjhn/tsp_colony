@@ -1,3 +1,5 @@
+use crate::config::DistanceT;
+use crate::config::Zeroable;
 use std::{cmp::max, time::Instant};
 
 use mpi::traits::CommunicatorCollectives;
@@ -309,8 +311,8 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
     fn construct_ant_tours(&mut self, distrib01: &Uniform<Float>) -> ShortLongIterationTours {
         let mut iteration_tours = ShortLongIterationTours {
             short_tour_ant_idx: 0,
-            short_tour_length: u32::MAX,
-            long_tour_length: 0,
+            short_tour_length: DistanceT::MAX,
+            long_tour_length: DistanceT::ZERO,
         };
         let num_cities = self.number_of_cities() as usize;
 
@@ -373,8 +375,8 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         &self,
         cpus_best_tours_buf: &[CityIndex],
         proc_distances: &mut SquareMatrix<u16>,
-    ) -> (Vec<Float>, u32) {
-        let mut shortest_tour_so_far = u32::MAX;
+    ) -> (Vec<Float>, DistanceT) {
+        let mut shortest_tour_so_far = DistanceT::MAX;
         let num_cities = self.number_of_cities() as usize;
         let chunk_size = num_cities + Tour::APPENDED_HACK_ELEMENTS;
         debug_assert_eq!(cpus_best_tours_buf.len() % chunk_size, 0);
@@ -420,7 +422,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
     }
 
     // TODO: what fitness function to use is not specified in the paper, maybe it does not matter?
-    fn fitness(&self, tour_length: u32) -> Float {
+    fn fitness(&self, tour_length: DistanceT) -> Float {
         let optimal = self.tsp_problem.solution_length();
         optimal as Float / tour_length as Float
     }
@@ -477,7 +479,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         best_partner_tour: &[CityIndex],
         partner_fitness: Float,
         self_fitness: Float,
-        best_partner_tour_length: u32,
+        best_partner_tour_length: DistanceT,
         mut delta_tau_matrix: &mut SquareMatrix<Float>,
         delta_tau_min: Float,
         capital_q: Float,
@@ -545,7 +547,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
     }
 
     /// Returns best tour index and its length.
-    fn global_best_tour_length(&self, cpus_best_tours_buf: &[CityIndex]) -> (usize, u32) {
+    fn global_best_tour_length(&self, cpus_best_tours_buf: &[CityIndex]) -> (usize, DistanceT) {
         let chunk_size = self.number_of_cities() + Tour::APPENDED_HACK_ELEMENTS;
 
         cpus_best_tours_buf
@@ -553,7 +555,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
             .map(|tour_with_hacks| tour_with_hacks.get_hack_tour_length())
             .enumerate()
             .fold(
-                (0, u32::MAX),
+                (0, DistanceT::MAX),
                 |(best_tour_idx, best_tour_length), (idx, tour_with_hacks_len)| {
                     if tour_with_hacks_len < best_tour_length {
                         (idx, tour_with_hacks_len)
@@ -576,8 +578,8 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
 #[derive(Clone, Copy, Debug)]
 struct ShortLongIterationTours {
     short_tour_ant_idx: usize,
-    short_tour_length: u32,
-    long_tour_length: u32,
+    short_tour_length: DistanceT,
+    long_tour_length: DistanceT,
 }
 
 impl ShortLongIterationTours {

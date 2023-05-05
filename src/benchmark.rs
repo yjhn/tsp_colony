@@ -9,7 +9,7 @@ use rand::{Rng, SeedableRng};
 use serde::Serialize;
 
 use crate::arguments::{DuplicateHandling, PopulationSizes};
-use crate::config::Float;
+use crate::config::{DistanceT, Float};
 use crate::paco_runner::PacoRunner;
 use crate::tsp_problem::TspProblem;
 use crate::utils::{initialize_random_seed, Mpi};
@@ -32,7 +32,7 @@ struct AntCycleConstants {
 struct RunResult {
     run_number: u32,
     found_optimal_tour: bool,
-    shortest_found_tour: u32,
+    shortest_found_tour: DistanceT,
     iteration_reached: u32,
     duration_millis: u128,
 }
@@ -40,7 +40,7 @@ struct RunResult {
 #[derive(Serialize)]
 struct ShortProblemDesc<'a> {
     name: &'a str,
-    optimal_length: u32,
+    optimal_length: DistanceT,
 }
 
 #[derive(Serialize)]

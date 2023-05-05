@@ -33,5 +33,13 @@ pub const RESULTS_DIR: &str = "results";
 
 /// Float type to use everywhere (pheromone and quantities).
 pub type Float = f32;
+
+pub type DistanceT = u32;
+pub trait Zeroable {
+    const ZERO: Self;
+}
+impl Zeroable for DistanceT {
+    const ZERO: Self = 0;
+}
 // Alternatives: StdRng
-pub type RNG = SmallRng;
+pub type MainRng = SmallRng;

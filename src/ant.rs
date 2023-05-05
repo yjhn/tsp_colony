@@ -1,7 +1,7 @@
 use rand::{distributions::Uniform, prelude::Distribution, seq::SliceRandom, Rng, SeedableRng};
 
 use crate::{
-    config::Float,
+    config::{DistanceT, Float},
     distance_matrix::DistanceMatrix,
     matrix::SquareMatrix,
     pheromone_visibility_matrix::PheromoneVisibilityMatrix,
@@ -19,7 +19,7 @@ pub struct Ant {
     tour: Vec<CityIndex>,
     // It would be cleaner to use Option<u32> here, but then it would have
     // to be unwrapped frequently.
-    tour_length: u32,
+    tour_length: DistanceT,
     // TODO: maybe remove current_city, since it is always the same as the last element in tour?
     current_city: CityIndex,
 }
@@ -33,14 +33,14 @@ impl Ant {
         Ant {
             unvisited_cities,
             tour,
-            tour_length: u32::MAX,
+            tour_length: DistanceT::MAX,
             current_city: starting_city,
         }
     }
 
     pub fn reset_to_city(&mut self, city_count: u16, starting_city: CityIndex) {
         self.tour.clear();
-        self.tour_length = u32::MAX;
+        self.tour_length = DistanceT::MAX;
         all_cities_fill(&mut self.unvisited_cities, city_count);
         self.visit_city(starting_city, starting_city.into());
     }
@@ -53,7 +53,7 @@ impl Ant {
     }
 
     pub fn update_pheromone(&self, delta_tau_matrix: &mut SquareMatrix<Float>, capital_q: Float) {
-        debug_assert!(self.tour_length < u32::MAX);
+        debug_assert!(self.tour_length < DistanceT::MAX);
 
         // TODO: should Q/L_k be Q/L_l? (current implementation assumes it)
         let delta_tau = capital_q / self.tour_length as Float;
@@ -61,9 +61,9 @@ impl Ant {
     }
 
     /// Calculates and caches tour length.
-    pub fn tour_length(&mut self, distances: &DistanceMatrix) -> u32 {
+    pub fn tour_length(&mut self, distances: &DistanceMatrix) -> DistanceT {
         // dbg!(self.tour.len());
-        if self.tour_length == u32::MAX {
+        if self.tour_length == DistanceT::MAX {
             self.tour_length = self.tour.calculate_tour_length(distances);
         }
         self.tour_length
@@ -143,7 +143,7 @@ impl Ant {
     pub fn clone_tour(&self, distances: &DistanceMatrix) -> Tour {
         debug_assert_eq!(self.unvisited_cities.len(), 0);
         // Length must be already calculated.
-        debug_assert!(self.tour_length != u32::MAX);
+        debug_assert!(self.tour_length != DistanceT::MAX);
 
         Tour::clone_from_cities(&self.tour, self.tour_length, distances)
     }

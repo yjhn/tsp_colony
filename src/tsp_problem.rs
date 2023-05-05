@@ -8,6 +8,7 @@ use tspf::{Tsp, TspBuilder};
 use rand::Rng;
 use rand::SeedableRng;
 
+use crate::config::{DistanceT, Zeroable};
 use crate::distance_matrix::DistanceMatrix;
 use crate::tour::CityIndex;
 use crate::tsplib::TspLibProblems;
@@ -22,7 +23,7 @@ pub struct TspProblem {
     cities: Vec<Point>,
     distances: DistanceMatrix,
     // This will be 0 for custom problems.
-    solution_length: u32,
+    solution_length: DistanceT,
 }
 
 impl TspProblem {
@@ -33,7 +34,7 @@ impl TspProblem {
             name: format!("random{}", rng.gen::<u32>()),
             cities,
             distances,
-            solution_length: 0,
+            solution_length: DistanceT::ZERO,
         }
     }
 
@@ -68,7 +69,7 @@ impl TspProblem {
 
         let distances = Self::calculate_distances(number_of_cities, &tsp);
 
-        let solution_length = TspLibProblems::from_str(name.as_str()).unwrap() as u32;
+        let solution_length = TspLibProblems::from_str(name.as_str()).unwrap() as u32 as DistanceT;
 
         TspProblem {
             name,
@@ -90,7 +91,7 @@ impl TspProblem {
         &self.name
     }
 
-    pub fn solution_length(&self) -> u32 {
+    pub fn solution_length(&self) -> DistanceT {
         self.solution_length
     }
 
@@ -137,7 +138,7 @@ impl TspProblem {
                 distances.set_dist(
                     CityIndex::new(ind1 as u16 - 1),
                     CityIndex::new(ind2 as u16 - 1),
-                    dist,
+                    dist as DistanceT,
                 );
             }
         }
@@ -170,7 +171,11 @@ fn generate_cities<R: Rng + SeedableRng>(
         for j in (i + 1)..city_count {
             let distance_f64 = Point::distance(cities[i], cities[j]);
             let distance = nint(distance_f64);
-            distances.set_dist(CityIndex::new(i as u16), CityIndex::new(j as u16), distance);
+            distances.set_dist(
+                CityIndex::new(i as u16),
+                CityIndex::new(j as u16),
+                distance as DistanceT,
+            );
         }
     }
 
