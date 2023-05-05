@@ -20,7 +20,7 @@ pub struct Ant {
     // It would be cleaner to use Option<u32> here, but then it would have
     // to be unwrapped frequently.
     tour_length: u32,
-    // TODO: maybe rmove current_city, since it is always the same as the last element in tour?
+    // TODO: maybe remove current_city, since it is always the same as the last element in tour?
     current_city: CityIndex,
 }
 
@@ -118,6 +118,7 @@ impl Ant {
             // let numerator = matrix.pheromone((ord.1, ord.0)).powf(alpha) * matrix.visibility(ord);
             let numerator = matrix.pheromone((ord.1, ord.0)) * matrix.visibility(ord);
             let p = numerator / denominator;
+            debug_assert!(p <= 1.0 && p >= 0.0, "p: {}", p);
             if p > distrib.sample(rng) {
                 // This city is the chosen one.
                 self.visit_city(city, idx);
@@ -140,6 +141,7 @@ impl Ant {
 
     /// Clones the ant's tour.
     pub fn clone_tour(&self, distances: &DistanceMatrix) -> Tour {
+        debug_assert_eq!(self.unvisited_cities.len(), 0);
         // Length must be already calculated.
         debug_assert!(self.tour_length != u32::MAX);
 

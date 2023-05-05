@@ -277,7 +277,7 @@ impl TourFunctions for [CityIndex] {
     }
 
     /// Returns the number of paths (edges) in one tour that are not in other.
-    /// Assumes that both tours have the same number of cities.
+    /// Both tours must have the same number of cities.
     fn distance(&self, other: &[CityIndex]) -> u16 {
         debug_assert_eq!(self.len(), other.len());
 
@@ -308,7 +308,7 @@ impl TourFunctions for [CityIndex] {
     // }
 
     fn update_pheromone(&self, delta_tau_matrix: &mut SquareMatrix<Float>, delta_tau: Float) {
-        for path in self.windows(2) {
+        for path in self.paths() {
             let &[c1, c2] = path else { unreachable!() };
             delta_tau_matrix[reverse_order(c1.into(), c2.into())] += delta_tau;
         }
