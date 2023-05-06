@@ -314,7 +314,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
             short_tour_length: DistanceT::MAX,
             long_tour_length: DistanceT::ZERO,
         };
-        let num_cities = self.number_of_cities() as usize;
+        let num_cities = self.number_of_cities();
 
         // Colony is stale if all ants find the same tour. Since actually
         // checking if tours match is expensive, we only check if they are
@@ -377,7 +377,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         proc_distances: &mut SquareMatrix<u16>,
     ) -> (Vec<Float>, DistanceT) {
         let mut shortest_tour_so_far = DistanceT::MAX;
-        let num_cities = self.number_of_cities() as usize;
+        let num_cities = self.number_of_cities();
         let chunk_size = num_cities + Tour::APPENDED_HACK_ELEMENTS;
         debug_assert_eq!(cpus_best_tours_buf.len() % chunk_size, 0);
         let mut fitness_scores = Vec::with_capacity(num_cities);
