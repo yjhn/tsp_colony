@@ -35,6 +35,10 @@ where
     pub fn row_mut(&mut self, y: usize) -> &mut [T] {
         &mut self.data[(self.side_length * y)..(self.side_length * (y + 1))]
     }
+
+    pub fn row(&self, y: usize) -> &[T] {
+        &self.data[(self.side_length * y)..(self.side_length * (y + 1))]
+    }
 }
 
 impl<T> Index<(usize, usize)> for SquareMatrix<T>

@@ -8,6 +8,8 @@ use crate::utils::all_cities;
 use crate::utils::order;
 use crate::utils::reverse_order;
 use mpi::traits::Equivalence;
+use rand::distributions::Uniform;
+use rand::prelude::Distribution;
 use rand::prelude::SliceRandom;
 use rand::Rng;
 use std::fmt::write;
@@ -322,7 +324,8 @@ impl Tour {
 
     /// Returns tour segment between (not including) `first` and `last` in tour order
     /// as the first elements in a newly created [Vec].
-    pub fn subtour(&self, first: usize, last: usize) -> Vec<CityIndex> {
+    pub fn subtour(&self, first: TourIndex, last: TourIndex) -> Vec<CityIndex> {
+        let (first, last) = (usize::from(first), usize::from(last));
         debug_assert_ne!(first, last);
         debug_assert!(first < self.number_of_cities() && last < self.number_of_cities());
         let mut segment = Vec::with_capacity(self.number_of_cities());
@@ -584,6 +587,38 @@ impl Tour {
         Tour {
             cities: cities_new,
             tour_length: self.tour_length - removed_paths_length + added_paths_length,
+        }
+    }
+
+    // Since R1 is the last index of new_tour, we simply append cities to it.
+    pub fn distort<R: Rng>(
+        &self,
+        mut t_hash: Vec<CityIndex>,
+        r1_idx: TourIndex,
+        r2_idx: TourIndex,
+        distrib01: Uniform<Float>,
+        rng: &mut R,
+        p_l: Float,
+        distances: &DistanceMatrix,
+    ) -> Tour {
+        // If we didn't create this subtour, we would need to keep track of used indices anyway,
+        // which would probably be much slower.
+        let mut t_star = self.subtour_inclusive(r1_idx, r2_idx);
+        for _ in 0..t_star.len() {
+            // TODO: use rng.gen_bool() where applicable.
+            if distrib01.sample(rng) <= p_l {
+                let chosen_city = rng.gen_range(0..t_star.len());
+                t_hash.push(t_star[chosen_city]);
+                t_star.swap_remove(chosen_city);
+            } else {
+                t_hash.push(t_star.pop().unwrap());
+            }
+        }
+
+        let tour_length = t_hash.calculate_tour_length(distances);
+        Tour {
+            cities: t_hash,
+            tour_length,
         }
     }
 }
