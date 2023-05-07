@@ -2,4 +2,4 @@
 
 ### License
 
-This project is licensed under AGPL v3.
+This project is licensed under AGPL-3.0-or-later.
