@@ -2,7 +2,9 @@
 
 mod ant;
 mod arguments;
+mod bee;
 mod benchmark;
+mod cabc;
 mod config;
 mod distance_matrix;
 mod gstm;
