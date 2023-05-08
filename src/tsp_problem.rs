@@ -10,7 +10,7 @@ use rand::SeedableRng;
 
 use crate::config::{DistanceT, Zeroable};
 use crate::distance_matrix::DistanceMatrix;
-use crate::tour::CityIndex;
+use crate::index::CityIndex;
 use crate::tsplib::TspLibProblems;
 
 // For randomly generated problems

@@ -1,5 +1,5 @@
 use crate::config::Float;
-use crate::tour::CityIndex;
+use crate::index::CityIndex;
 use mpi::environment::Universe;
 use mpi::{
     topology::{Process, SystemCommunicator},

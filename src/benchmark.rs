@@ -10,7 +10,7 @@ use serde::Serialize;
 
 use crate::arguments::{DuplicateHandling, PopulationSizes};
 use crate::config::{DistanceT, Float};
-use crate::paco_runner::PacoRunner;
+use crate::parallel_ant_colony::PacoRunner;
 use crate::tsp_problem::TspProblem;
 use crate::utils::{initialize_random_seed, Mpi};
 
@@ -170,7 +170,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                                                     name: problem.name(),
                                                     optimal_length: problem.solution_length(),
                                                 },
-                                                algorithm: "AntCycle",
+                                                algorithm: "PACO",
                                                 algorithm_constants: AntCycleConstants {
                                                     population_size: p,
                                                     alpha,

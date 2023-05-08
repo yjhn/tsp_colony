@@ -1,8 +1,8 @@
 use crate::{
     config::{self, Float},
     distance_matrix::DistanceMatrix,
+    index::CityIndex,
     matrix::SquareMatrix,
-    tour::CityIndex,
 };
 
 /// Upper right triangle: pheromone level.

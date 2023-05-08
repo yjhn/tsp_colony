@@ -3,9 +3,10 @@ use rand::{distributions::Uniform, prelude::Distribution, seq::SliceRandom, Rng,
 use crate::{
     config::{DistanceT, Float},
     distance_matrix::DistanceMatrix,
+    index::CityIndex,
     matrix::SquareMatrix,
     pheromone_visibility_matrix::PheromoneVisibilityMatrix,
-    tour::{CityIndex, Tour, TourFunctions},
+    tour::{Tour, TourFunctions},
     utils::{all_cities, all_cities_fill, order, reverse_order},
 };
 use iterator_ilp::IteratorILP;

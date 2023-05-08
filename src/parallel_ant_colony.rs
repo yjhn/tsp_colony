@@ -1,5 +1,6 @@
 use crate::config::DistanceT;
 use crate::config::Zeroable;
+use crate::index::CityIndex;
 use std::{cmp::max, time::Instant};
 
 use mpi::traits::CommunicatorCollectives;
@@ -15,7 +16,7 @@ use crate::{
     config::{self, Float},
     matrix::SquareMatrix,
     pheromone_visibility_matrix::PheromoneVisibilityMatrix,
-    tour::{CityIndex, Tour, TourFunctions},
+    tour::{Tour, TourFunctions},
     tsp_problem::TspProblem,
     utils::{maxf, Mpi},
 };

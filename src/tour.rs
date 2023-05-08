@@ -1,139 +1,25 @@
-use crate::config::DistanceT;
-use crate::config::Float;
-use crate::config::Zeroable;
-use crate::distance_matrix::DistanceMatrix;
-use crate::matrix::SquareMatrix;
-use crate::static_assert;
-use crate::utils::all_cities;
-use crate::utils::order;
-use crate::utils::reverse_order;
-use mpi::traits::Equivalence;
-use rand::distributions::Uniform;
-use rand::prelude::Distribution;
-use rand::prelude::SliceRandom;
-use rand::Rng;
-use std::fmt::write;
-use std::fmt::Debug;
-use std::fmt::Display;
-use std::fs::File;
-use std::io::BufWriter;
-use std::io::Write;
-use std::mem::size_of;
-use std::ops::Index;
-use std::ops::Sub;
-use std::path::Path;
-use std::slice::Windows;
-
-/// Index of the city in the city matrix.
-/// `u16` is enough since it is extremely unlikely that number of cities would be greater.
-#[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Equivalence)]
-pub struct CityIndex(u16);
-
-impl CityIndex {
-    pub fn new(index: u16) -> CityIndex {
-        CityIndex(index)
-    }
-
-    pub fn from_be_bytes(b1: u8, b2: u8) -> CityIndex {
-        CityIndex::new(u16::from_be_bytes([b1, b2]))
-    }
-}
-
-impl From<CityIndex> for u16 {
-    fn from(value: CityIndex) -> Self {
-        value.0
-    }
-}
-
-impl From<CityIndex> for usize {
-    fn from(value: CityIndex) -> Self {
-        value.0.into()
-    }
-}
-
-impl From<&CityIndex> for usize {
-    fn from(value: &CityIndex) -> Self {
-        value.0.into()
-    }
-}
-
-impl Debug for CityIndex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "c{}", self.0)
-    }
-}
-
-impl Display for CityIndex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // write!(f, "CityIndex({})", self.0)
-        write!(f, "c{}", self.0)
-    }
-}
-
-/// Type for tour indexing.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TourIndex(usize);
-
-impl TourIndex {
-    pub fn new(idx: usize) -> Self {
-        Self(idx)
-    }
-
-    pub fn random<R: Rng>(rng: &mut R, number_of_cities: usize) -> Self {
-        Self::new(rng.gen_range(0..number_of_cities))
-    }
-
-    pub fn wrapping_inc(self, max: usize) -> Self {
-        if self.0 == max {
-            Self::new(0)
-        } else {
-            Self::new(self.0 + 1)
-        }
-    }
-
-    pub fn wrapping_dec(self, max: usize) -> Self {
-        if self.0 > 0 {
-            Self::new(self.0 - 1)
-        } else {
-            Self::new(max)
-        }
-    }
-
-    pub fn is_last(self, max: usize) -> bool {
-        self.0 == max
-    }
-
-    pub fn is_first(self) -> bool {
-        self.0 == 0
-    }
-}
-
-impl Display for TourIndex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "t{}", self.0)
-    }
-}
-
-impl Debug for TourIndex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "t{}", self.0)
-    }
-}
-
-impl From<TourIndex> for usize {
-    fn from(value: TourIndex) -> Self {
-        value.0
-    }
-}
-
-impl Sub<TourIndex> for TourIndex {
-    type Output = usize;
-
-    fn sub(self, rhs: TourIndex) -> Self::Output {
-        self.0 - rhs.0
-    }
-}
+use crate::{
+    config::{DistanceT, Float, Zeroable},
+    distance_matrix::DistanceMatrix,
+    index::{CityIndex, TourIndex},
+    matrix::SquareMatrix,
+    static_assert,
+    utils::{all_cities, order, reverse_order},
+};
+use rand::{
+    distributions::Uniform,
+    prelude::{Distribution, SliceRandom},
+    Rng,
+};
+use std::{
+    fmt::{write, Debug, Display},
+    fs::File,
+    io::{BufWriter, Write},
+    mem::size_of,
+    ops::{Deref, Index, Sub},
+    path::Path,
+    slice::Windows,
+};
 
 #[derive(Debug, Clone)]
 pub struct Tour {
@@ -156,20 +42,12 @@ impl Tour {
         tour_length: DistanceT::MAX,
     };
 
-    pub fn number_of_cities(&self) -> usize {
-        self.cities.len()
-    }
-
     pub fn length(&self) -> DistanceT {
         self.tour_length
     }
 
     pub fn cities(&self) -> &[CityIndex] {
         &self.cities
-    }
-
-    pub fn index_of(&self, city: CityIndex) -> TourIndex {
-        TourIndex::new(self.cities.iter().position(|&elem| elem == city).unwrap())
     }
 
     pub fn from_cities(cities: Vec<CityIndex>, distances: &DistanceMatrix) -> Tour {
@@ -236,16 +114,6 @@ impl Tour {
         writeln!(file).unwrap();
     }
 
-    pub fn last_to_first_path(&self) -> (CityIndex, CityIndex) {
-        (*self.cities.last().unwrap(), self.cities[0])
-    }
-
-    // Returns iterator over all paths except for the
-    // first -> last.
-    pub fn paths(&self) -> Windows<'_, CityIndex> {
-        self.cities.windows(2)
-    }
-
     /// Creates a new `Tour` by cloning the provided slice. Trusts that `length`
     /// is correct.
     pub fn clone_from_cities(
@@ -259,16 +127,6 @@ impl Tour {
             cities: tour.to_owned(),
             tour_length: length,
         }
-    }
-
-    pub fn distance(&self, other: &[CityIndex]) -> u16 {
-        self.cities.distance(other)
-    }
-
-    /// Returns true if the tour being constructed by this ant has in edge between `first`
-    /// and `second`. Order does not matter.
-    pub fn has_path(&self, x: CityIndex, y: CityIndex) -> bool {
-        self.cities.has_path(x, y)
     }
 
     // This function call must be matched by the corresponding
@@ -298,109 +156,20 @@ impl Tour {
         }
     }
 
-    pub fn swap(&mut self, city_1: TourIndex, city_2: TourIndex) {
-        self.cities.swap(city_1.into(), city_2.into());
-    }
+    // More is better.
+    pub fn gain_from_2_opt(
+        x1: CityIndex,
+        x2: CityIndex,
+        y1: CityIndex,
+        y2: CityIndex,
+        x2_y2_dist: DistanceT,
+        distances: &DistanceMatrix,
+    ) -> i32 {
+        let del_length = distances[(x1, x2)] + distances[(y1, y2)];
+        let add_length = distances[(x1, y1)] + x2_y2_dist;
 
-    // Tour is circular.
-    pub fn previous_idx(&self, city: TourIndex) -> TourIndex {
-        debug_assert!(usize::from(city) < self.number_of_cities());
-        city.wrapping_dec(self.number_of_cities() - 1)
-    }
-
-    pub fn previous_city(&self, city: TourIndex) -> CityIndex {
-        // Implementing Index for slice does not make it work for Vec, only on slice.
-        self.cities.as_slice()[self.previous_idx(city)]
-    }
-
-    pub fn next_idx(&self, city: TourIndex) -> TourIndex {
-        debug_assert!(usize::from(city) < self.number_of_cities());
-        city.wrapping_inc(self.number_of_cities() - 1)
-    }
-
-    pub fn next_city(&self, city: TourIndex) -> CityIndex {
-        self.cities.as_slice()[self.next_idx(city)]
-    }
-
-    /// Returns tour segment between (not including) `first` and `last` in tour order
-    /// as the first elements in a newly created [Vec].
-    pub fn subtour(&self, first: TourIndex, last: TourIndex) -> Vec<CityIndex> {
-        let (first, last) = (usize::from(first), usize::from(last));
-        debug_assert_ne!(first, last);
-        debug_assert!(first < self.number_of_cities() && last < self.number_of_cities());
-        let mut segment = Vec::with_capacity(self.number_of_cities());
-        if first > last {
-            // if `first` is the last index and `last` is 0, this returns empty segment
-            // From `first` to the end...
-            segment.extend_from_slice(&self.cities[(first + 1)..]);
-            // ...and from start to `last`.
-            segment.extend_from_slice(&self.cities[..last]);
-        } else {
-            // first < last
-            // if first - last == 1, this returns empty segment
-            segment.extend_from_slice(&self.cities[(first + 1)..last]);
-        }
-        segment
-    }
-
-    /// Returns tour segment between (and including) `first` and `last` in tour order
-    /// as the first elements in a newly created [Vec].
-    pub fn subtour_inclusive(&self, first: TourIndex, last: TourIndex) -> Vec<CityIndex> {
-        let (first, last) = (usize::from(first), usize::from(last));
-        debug_assert_ne!(first, last);
-        debug_assert!(first < self.number_of_cities() && last < self.number_of_cities());
-        let mut segment = Vec::with_capacity(self.number_of_cities());
-        if first > last {
-            // if `first` is the last index and `last` is 0, this returns empty segment
-            // From `first` to the end...
-            segment.extend_from_slice(&self.cities[first..]);
-            // ...and from start to `last`.
-            segment.extend_from_slice(&self.cities[..=last]);
-        } else {
-            // first < last
-            // if first - last == 1, this returns empty segment
-            segment.extend_from_slice(&self.cities[first..=last]);
-        }
-        segment
-    }
-
-    // Similar to `subtour`, but this appends and is inclusive.
-    pub fn append_subtour(&self, first: usize, last: usize, buf: &mut Vec<CityIndex>) {
-        debug_assert_ne!(first, last);
-        debug_assert!(first < self.number_of_cities() && last < self.number_of_cities());
-        if first > last {
-            // From `first` to the end...
-            buf.extend_from_slice(&self.cities[first..]);
-            // ...and from start to `last`.
-            buf.extend_from_slice(&self.cities[..=last]);
-        } else {
-            // first < last
-            buf.extend_from_slice(&self.cities[first..=last]);
-        }
-    }
-
-    pub fn append_reversed_subtour(&self, first: usize, last: usize, buf: &mut Vec<CityIndex>) {
-        debug_assert_ne!(first, last);
-        debug_assert!(first < self.number_of_cities() && last < self.number_of_cities());
-        if first > last {
-            // From `last` to start...
-            buf.extend(self.cities[..=last].iter().rev());
-            // ...and from last to `first`.
-            buf.extend(self.cities[first..].iter().rev());
-        } else {
-            // first < last
-            buf.extend(self.cities[first..=last].iter().rev());
-        }
-    }
-
-    /// Number of cities in segment, `start` and `end` included.
-    pub fn segment_len(&self, start: TourIndex, end: TourIndex) -> usize {
-        if start <= end {
-            end - start + 1
-        } else {
-            // Segment wraps around the end.
-            (self.number_of_cities() - 1 - usize::from(start)) + usize::from(end) + 1
-        }
+        // Gain can be < 0, use i32.
+        del_length as i32 - add_length as i32
     }
 
     fn update_shortest(
@@ -428,13 +197,25 @@ impl Tour {
         }
     }
 
-    /// Returns true if `c2` goes right after `c1` in the tour.
-    pub fn is_next(&self, c1: TourIndex, c2: TourIndex) -> bool {
-        if c1 < c2 {
-            c2 - c1 == 1
-        } else {
-            c1.is_last(self.number_of_cities() - 1) && c2.is_first()
+    pub fn reverse_segment(&mut self, start: TourIndex, end: TourIndex, length_gain: i32) {
+        let mut left: usize = start.into();
+        let mut right: usize = end.into();
+        let len = self.number_of_cities();
+
+        let inversion_size = ((len + right - left + 1) % len) / 2;
+        // dbg!(inversion_size);
+        // assert!(inversion_size >= 1);
+        // if inversion_size == 0 {
+        //     dbg!();
+        // }
+
+        for _ in 1..=inversion_size {
+            self.swap(TourIndex::new(left), TourIndex::new(right));
+            left = (left + 1) % len;
+            right = (len + right - 1) % len;
         }
+
+        self.tour_length = (self.tour_length as i32 - length_gain) as DistanceT;
     }
 
     // TODO: galima paminėti, kad čia visai panašu į 3-opt subset, kai jau pasirinkom
@@ -621,9 +402,28 @@ impl Tour {
             tour_length,
         }
     }
+
+    pub fn swap(&mut self, city_1: TourIndex, city_2: TourIndex) {
+        self.cities.swap(city_1.into(), city_2.into());
+    }
+}
+
+impl Deref for Tour {
+    type Target = [CityIndex];
+
+    fn deref(&self) -> &Self::Target {
+        self.cities()
+    }
 }
 
 pub trait TourFunctions {
+    fn dist_to_preceding(
+        &self,
+        c: TourIndex,
+        c_city: CityIndex,
+        distances: &DistanceMatrix,
+    ) -> DistanceT;
+
     fn calculate_tour_length(&self, distances: &DistanceMatrix) -> DistanceT;
 
     fn get_hack_tour_length(&self) -> DistanceT;
@@ -637,9 +437,123 @@ pub trait TourFunctions {
     fn distance(&self, other: &[CityIndex]) -> u16;
 
     fn update_pheromone(&self, delta_tau_matrix: &mut SquareMatrix<Float>, delta_tau: Float);
+
+    fn index_of(&self, city: CityIndex) -> TourIndex;
+
+    fn number_of_cities(&self) -> usize;
+    fn previous_idx(&self, city: TourIndex) -> TourIndex;
+    fn previous_city(&self, city: TourIndex) -> CityIndex;
+    fn next_idx(&self, city: TourIndex) -> TourIndex;
+    fn next_city(&self, city: TourIndex) -> CityIndex;
+    fn is_next(&self, c1: TourIndex, c2: TourIndex) -> bool;
+    fn segment_len(&self, start: TourIndex, end: TourIndex) -> usize;
+    fn subtour_inclusive(&self, first: TourIndex, last: TourIndex) -> Vec<CityIndex>;
+    fn append_subtour(&self, first: usize, last: usize, buf: &mut Vec<CityIndex>);
+    fn append_reversed_subtour(&self, first: usize, last: usize, buf: &mut Vec<CityIndex>);
+    fn subtour(&self, first: TourIndex, last: TourIndex) -> Vec<CityIndex>;
+    fn last_to_first_path(&self) -> (CityIndex, CityIndex);
 }
 
 impl TourFunctions for [CityIndex] {
+    fn last_to_first_path(&self) -> (CityIndex, CityIndex) {
+        (*self.last().unwrap(), self[0])
+    }
+    /// Returns tour segment between (not including) `first` and `last` in tour order
+    /// as the first elements in a newly created [Vec].
+    fn subtour(&self, first: TourIndex, last: TourIndex) -> Vec<CityIndex> {
+        let (first, last) = (usize::from(first), usize::from(last));
+        debug_assert_ne!(first, last);
+        debug_assert!(first < self.number_of_cities() && last < self.number_of_cities());
+        let mut segment = Vec::with_capacity(self.number_of_cities());
+        if first > last {
+            // if `first` is the last index and `last` is 0, this returns empty segment
+            // From `first` to the end...
+            segment.extend_from_slice(&self[(first + 1)..]);
+            // ...and from start to `last`.
+            segment.extend_from_slice(&self[..last]);
+        } else {
+            // first < last
+            // if first - last == 1, this returns empty segment
+            segment.extend_from_slice(&self[(first + 1)..last]);
+        }
+        segment
+    }
+    /// Returns tour segment between (and including) `first` and `last` in tour order
+    /// as the first elements in a newly created [Vec].
+    fn subtour_inclusive(&self, first: TourIndex, last: TourIndex) -> Vec<CityIndex> {
+        let (first, last) = (usize::from(first), usize::from(last));
+        debug_assert_ne!(first, last);
+        debug_assert!(first < self.number_of_cities() && last < self.number_of_cities());
+        let mut segment = Vec::with_capacity(self.number_of_cities());
+        if first > last {
+            // if `first` is the last index and `last` is 0, this returns empty segment
+            // From `first` to the end...
+            segment.extend_from_slice(&self[first..]);
+            // ...and from start to `last`.
+            segment.extend_from_slice(&self[..=last]);
+        } else {
+            // first < last
+            // if first - last == 1, this returns empty segment
+            segment.extend_from_slice(&self[first..=last]);
+        }
+        segment
+    }
+
+    // Similar to `subtour`, but this appends and is inclusive.
+    fn append_subtour(&self, first: usize, last: usize, buf: &mut Vec<CityIndex>) {
+        debug_assert_ne!(first, last);
+        debug_assert!(first < self.number_of_cities() && last < self.number_of_cities());
+        if first > last {
+            // From `first` to the end...
+            buf.extend_from_slice(&self[first..]);
+            // ...and from start to `last`.
+            buf.extend_from_slice(&self[..=last]);
+        } else {
+            // first < last
+            buf.extend_from_slice(&self[first..=last]);
+        }
+    }
+
+    fn append_reversed_subtour(&self, first: usize, last: usize, buf: &mut Vec<CityIndex>) {
+        debug_assert_ne!(first, last);
+        debug_assert!(first < self.number_of_cities() && last < self.number_of_cities());
+        if first > last {
+            // From `last` to start...
+            buf.extend(self[..=last].iter().rev());
+            // ...and from last to `first`.
+            buf.extend(self[first..].iter().rev());
+        } else {
+            // first < last
+            buf.extend(self[first..=last].iter().rev());
+        }
+    }
+
+    /// Number of cities in segment, `start` and `end` included.
+    fn segment_len(&self, start: TourIndex, end: TourIndex) -> usize {
+        if start <= end {
+            end - start + 1
+        } else {
+            // Segment wraps around the end.
+            (self.number_of_cities() - 1 - usize::from(start)) + usize::from(end) + 1
+        }
+    }
+    /// Returns true if `c2` goes right after `c1` in the tour.
+    fn is_next(&self, c1: TourIndex, c2: TourIndex) -> bool {
+        if c1 < c2 {
+            c2 - c1 == 1
+        } else {
+            c1.is_last(self.number_of_cities() - 1) && c2.is_first()
+        }
+    }
+    fn dist_to_preceding(
+        &self,
+        c: TourIndex,
+        c_city: CityIndex,
+        distances: &DistanceMatrix,
+    ) -> DistanceT {
+        distances[(c_city, self.previous_city(c))]
+    }
+
     fn calculate_tour_length(&self, distances: &DistanceMatrix) -> DistanceT {
         assert!(self.len() > 1);
 
@@ -666,6 +580,8 @@ impl TourFunctions for [CityIndex] {
         DistanceT::from_be_bytes([b1, b2, b3, b4])
     }
 
+    /// Returns true if the tour being constructed by this ant has in edge between `first`
+    /// and `second`. Order does not matter.
     fn has_path(&self, x: CityIndex, y: CityIndex) -> bool {
         let inner_paths = self.paths().any(|pair| {
             let &[c1, c2] = pair else { unreachable!() };
@@ -691,6 +607,8 @@ impl TourFunctions for [CityIndex] {
         num_cities - common_edges
     }
 
+    // Returns iterator over all paths except for the
+    // first -> last.
     fn paths(&self) -> Windows<CityIndex> {
         self.windows(2)
     }
@@ -712,6 +630,32 @@ impl TourFunctions for [CityIndex] {
         let [b3, b4] = cvg_part_1.to_be_bytes();
         let [b1, b2] = cvg_part_2.to_be_bytes();
         Float::from_be_bytes([b1, b2, b3, b4])
+    }
+
+    fn index_of(&self, city: CityIndex) -> TourIndex {
+        TourIndex::new(self.iter().position(|&elem| elem == city).unwrap())
+    }
+
+    fn number_of_cities(&self) -> usize {
+        self.len()
+    }
+
+    fn previous_idx(&self, city: TourIndex) -> TourIndex {
+        debug_assert!(usize::from(city) < self.number_of_cities());
+        city.wrapping_dec(self.number_of_cities() - 1)
+    }
+
+    fn previous_city(&self, city: TourIndex) -> CityIndex {
+        self[self.previous_idx(city)]
+    }
+
+    fn next_idx(&self, city: TourIndex) -> TourIndex {
+        debug_assert!(usize::from(city) < self.number_of_cities());
+        city.wrapping_inc(self.number_of_cities() - 1)
+    }
+
+    fn next_city(&self, city: TourIndex) -> CityIndex {
+        self[self.next_idx(city)]
     }
 }
 
