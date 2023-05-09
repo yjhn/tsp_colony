@@ -50,9 +50,9 @@ pub fn generate_neighbour<R: Rng>(
             let mut new_tour = t_i.clone();
             // Choose random neighbours.
             let (nl_r1, dist_r1, nl_r1_in_tour) =
-                choose_non_preceding(&r1_neighbourhood_list, rng, r1_idx, new_tour.cities());
+                choose_non_preceding(r1_neighbourhood_list, rng, r1_idx, new_tour.cities());
             let (nl_r2, dist_r2, nl_r2_in_tour) =
-                choose_non_preceding(&r2_neighbourhood_list, rng, r2_idx, new_tour.cities());
+                choose_non_preceding(r2_neighbourhood_list, rng, r2_idx, new_tour.cities());
             let r1_prec = new_tour[before_t_star_i];
             let nl_r1_prec = new_tour.previous_idx(nl_r1_in_tour);
             let nl_r1_succ = new_tour.next_idx(nl_r1_in_tour);

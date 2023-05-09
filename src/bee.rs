@@ -1,7 +1,7 @@
 use rand::{seq::SliceRandom, Rng};
 
 use crate::{
-    cabc::NeighbourMatrix,
+    cabc::{NeighbourMatrix, TourExt},
     config::{DistanceT, Float},
     distance_matrix::DistanceMatrix,
     gstm,
@@ -22,7 +22,7 @@ impl Bee {
     // Returns a new tour if it is better than x_i.
     pub fn employed_phase<R: Rng>(
         x_i: &Tour,
-        tours: &[(Tour, u32)],
+        tours: &[TourExt],
         rng: &mut R,
         distances: &DistanceMatrix,
         neighbourhood_lists: &NeighbourMatrix,
@@ -30,8 +30,7 @@ impl Bee {
         p_cp: Float,
         p_l: Float,
     ) -> Option<Tour> {
-        let t_i = x_i;
-        let t_k = &tours.choose(rng).unwrap().0;
+        let t_k = tours.choose(rng).unwrap().tour();
         let v_i = gstm::generate_neighbour(
             x_i,
             t_k,
@@ -42,7 +41,7 @@ impl Bee {
             neighbourhood_lists,
             distances,
         );
-        if v_i.is_shorter_than(t_i) {
+        if v_i.is_shorter_than(x_i) {
             Some(v_i)
         } else {
             None
@@ -50,14 +49,17 @@ impl Bee {
     }
 
     pub fn scout_phase<R: Rng>(
-        (x_i, non_improvement_gens): &mut (Tour, u32),
-        max_non_improvement_gens: u32,
+        x_i: &mut TourExt,
+        max_non_improvement_iters: u32,
         rng: &mut R,
         distances: &DistanceMatrix,
     ) {
-        if *non_improvement_gens == max_non_improvement_gens {
-            *x_i = Tour::random(x_i.number_of_cities() as u16, distances, rng);
-            *non_improvement_gens = 0;
+        if x_i.non_improvement_iters() == max_non_improvement_iters {
+            x_i.set_tour(Tour::random(
+                x_i.tour().number_of_cities() as u16,
+                distances,
+                rng,
+            ));
         }
     }
 }
