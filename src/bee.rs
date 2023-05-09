@@ -1,9 +1,12 @@
 use rand::{seq::SliceRandom, Rng};
 
 use crate::{
-    config::Float,
+    cabc::NeighbourMatrix,
+    config::{DistanceT, Float},
     distance_matrix::DistanceMatrix,
     gstm,
+    index::CityIndex,
+    matrix::Matrix,
     tour::{Tour, TourFunctions},
 };
 
@@ -22,14 +25,23 @@ impl Bee {
         tours: &[(Tour, u32)],
         rng: &mut R,
         distances: &DistanceMatrix,
+        neighbourhood_lists: &NeighbourMatrix,
         p_rc: Float,
         p_cp: Float,
         p_l: Float,
-        nl_max: u16,
     ) -> Option<Tour> {
         let t_i = x_i;
         let t_k = &tours.choose(rng).unwrap().0;
-        let v_i = gstm::generate_neighbour(x_i, t_k, rng, p_rc, p_cp, p_l, nl_max, distances);
+        let v_i = gstm::generate_neighbour(
+            x_i,
+            t_k,
+            rng,
+            p_rc,
+            p_cp,
+            p_l,
+            neighbourhood_lists,
+            distances,
+        );
         if v_i.is_shorter_than(t_i) {
             Some(v_i)
         } else {

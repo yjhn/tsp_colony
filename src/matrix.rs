@@ -82,3 +82,45 @@ impl<T: FloatDisplay> Display for SquareMatrix<T> {
         Ok(())
     }
 }
+
+pub struct Matrix<T>
+where
+    T: Copy,
+{
+    data: Vec<T>,
+    row_length: usize,
+    rows: usize,
+}
+
+impl<T> Matrix<T>
+where
+    T: Copy,
+{
+    pub fn new(row_length: usize, rows: usize, init_value: T) -> Matrix<T> {
+        Self {
+            data: vec![init_value; row_length * rows],
+            row_length,
+            rows,
+        }
+    }
+
+    pub fn row_length(&self) -> usize {
+        self.row_length
+    }
+
+    pub fn rows(&self) -> usize {
+        self.rows
+    }
+
+    pub fn fill(&mut self, value: T) {
+        self.data.fill(value);
+    }
+
+    pub fn row_mut(&mut self, y: usize) -> &mut [T] {
+        &mut self.data[(self.row_length * y)..(self.row_length * (y + 1))]
+    }
+
+    pub fn row(&self, y: usize) -> &[T] {
+        &self.data[(self.row_length * y)..(self.row_length * (y + 1))]
+    }
+}

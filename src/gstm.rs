@@ -5,9 +5,11 @@
 use rand::{distributions::Uniform, prelude::Distribution, seq::SliceRandom, Rng};
 
 use crate::{
+    cabc::NeighbourMatrix,
     config::{DistanceT, Float, MainRng},
     distance_matrix::DistanceMatrix,
     index::{CityIndex, TourIndex},
+    matrix::Matrix,
     tour::{Tour, TourFunctions},
 };
 
@@ -20,7 +22,7 @@ pub fn generate_neighbour<R: Rng>(
     p_rc: Float,
     p_cp: Float,
     p_l: Float,
-    nl_max: u16,
+    neighbourhood_lists: &NeighbourMatrix,
     distances: &DistanceMatrix,
 ) -> Tour {
     // t_star_i is the open tour segment.
@@ -42,10 +44,8 @@ pub fn generate_neighbour<R: Rng>(
         } else {
             let r1 = t_i[r1_idx];
             let r2 = t_i[r2_idx];
-            // TODO: precompute neighbour lists for all cities in advance.
-            let r1_neighbourhood_list = distances.neighbourhood_list(r1, nl_max);
-            let r2_neighbourhood_list = distances.neighbourhood_list(r2, nl_max);
-
+            let r1_neighbourhood_list = neighbourhood_lists.row(usize::from(r1));
+            let r2_neighbourhood_list = neighbourhood_lists.row(usize::from(r2));
             // TODO: kaip suprantu, paliekam t_i nepakeistą, tik nl_r1 arba nl_r2 perkeliam kitur?
             let mut new_tour = t_i.clone();
             // Choose random neighbours.

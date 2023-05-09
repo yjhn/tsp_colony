@@ -2,7 +2,12 @@
 
 use rand::Rng;
 
-use crate::{bee::Bee, config::DistanceT, tour::Tour, tsp_problem::TspProblem};
+use crate::{
+    bee::Bee, config::DistanceT, index::CityIndex, matrix::Matrix, tour::Tour,
+    tsp_problem::TspProblem,
+};
+
+pub type NeighbourMatrix = Matrix<(CityIndex, DistanceT)>;
 
 pub struct CombArtBeeColony<'a, R: Rng> {
     bees: Vec<Bee>,
@@ -11,6 +16,8 @@ pub struct CombArtBeeColony<'a, R: Rng> {
     best_tour: Tour,
     tour_non_improvement_limit: u32,
     tsp_problem: &'a TspProblem,
+    // Row i is neighbour list for city CityIndex(i).
+    neighbour_lists: NeighbourMatrix,
     rng: &'a mut R,
 }
 
@@ -19,6 +26,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
         tsp_problem: &'a TspProblem,
         colony_size: u32,
         tour_non_improvement_limit: u32,
+        nl_max: u16,
         rng: &'a mut R,
     ) -> Self {
         let mut tours = Vec::with_capacity(colony_size as usize);
@@ -34,6 +42,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
             tours.push((tour, 0));
         }
         let best_tour = tours[best_tour_idx as usize].0.clone();
+        let neighbour_lists = tsp_problem.distances().neighbourhood_lists(nl_max);
 
         Self {
             bees: (0..colony_size).map(|_| Bee::new()).collect(),
@@ -42,6 +51,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
             best_tour,
             tour_non_improvement_limit,
             tsp_problem,
+            neighbour_lists,
             rng,
         }
     }
@@ -52,7 +62,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
 
     pub fn iterate_until_optimal(&mut self, max_iterations: u32) -> bool {
         let num_cities = self.number_of_cities();
-        // TODO: what is the split between employed bees and foragersi (onlookers)?
+        // TODO: what is the split between employed bees and foragers (onlookers)?
         // For now we will assume that all bees are both foragers and onlookers.
         let mut found_optimal = false;
 

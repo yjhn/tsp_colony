@@ -1,4 +1,4 @@
-use crate::{config::Zeroable, index::CityIndex};
+use crate::{config::Zeroable, index::CityIndex, matrix::Matrix};
 use std::ops::Index;
 
 use crate::{
@@ -23,6 +23,45 @@ impl DistanceMatrix {
         // Distance matrix is symmetric.
         self.0[(c1.into(), c2.into())] = distance;
         self.0[(c2.into(), c1.into())] = distance;
+    }
+
+    /// Constructs a neighbourhood lists matrix. It will have `city_count` rows
+    /// and `size` columns.
+    pub fn neighbourhood_lists(&self, size: u16) -> Matrix<(CityIndex, DistanceT)> {
+        let mut matrix = Matrix::new(
+            usize::from(size),
+            self.side_length(),
+            (CityIndex::new(0), DistanceT::ZERO),
+        );
+
+        for city_idx in 0..self.side_length() {
+            let row = matrix.row_mut(city_idx);
+
+            // TODO: maybe there is a faster algorithm?
+            // The algorithm: attach city numbers to each distance in `city` row of the
+            // table. Then sort the table by distance, skip first (0 distance to self)
+            // and take the required amount.
+            let city = city_idx;
+            let mut nl_iter = self
+                .0
+                .row(city)
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(idx, dist)| (CityIndex::new(idx as u16), dist))
+                .take(usize::from(size + 1));
+            // Copy neighbours to slice.
+            for elem in nl_iter {
+                // Do not add self as a neighbour.
+                if usize::from(elem.0) == city_idx {
+                    continue;
+                }
+                row[usize::from(elem.0)] = elem;
+            }
+            row.sort_unstable_by_key(|&(idx, dist)| dist);
+        }
+
+        matrix
     }
 
     // This is expensive, cache whenever possible.
