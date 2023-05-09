@@ -323,9 +323,79 @@ impl Tour {
         // Construct a new Tour with the segment inserted into the chosen location.
         let mut cities_new = Vec::with_capacity(self.number_of_cities());
 
-        let new_segment_after: usize = self.next_idx(TourIndex::new(new_segment_before)).into();
         // New segment will be between new_segment_before and new_segment_after.
+        // Create the tour using old indices.
+        // new_segment_before is always between after_segment_end and before_segment_start
+        // (possibly wrapping around end).
+        // let new_segment_after: usize = self.next_idx(TourIndex::new(new_segment_before)).into();
+
+        let before_segment_start: usize = before_segment_start.into();
+        let after_segment_end: usize = after_segment_end.into();
+        if before_segment_start < after_segment_end {
+            // non-segment is in two parts
+            debug_assert!(
+                new_segment_before <= before_segment_start
+                    || new_segment_before >= after_segment_end
+            );
+            if new_segment_before < before_segment_start {
+                // Copy 0..=new_segment_before, then insert the segment,
+                // then copy new_segment_before + 1..=before_segment_start and
+                // after_segment_end..
+                cities_new.extend_from_slice(&self.cities[0..=new_segment_before]);
+
+                if reversed {
+                    // copy segment
+                } else {
+                    // copy segment
+                }
+
+                cities_new.extend_from_slice(
+                    &self.cities[(new_segment_before + 1)..=before_segment_start],
+                );
+                cities_new.extend_from_slice(&self.cities[after_segment_end..]);
+            } else {
+                // new_segment_before > after_segment_end
+                // Copy 0..=before_segment_start and after_segment_end..=new_segment_before
+                // then insert the segment, then copy new_segment_before+1..
+                cities_new.extend_from_slice(&self.cities[0..before_segment_start]);
+                cities_new.extend_from_slice(&self.cities[after_segment_end..=new_segment_before]);
+
+                if reversed {
+                    // copy segment
+                } else {
+                    // copy segment
+                }
+
+                // This might be an empty slice, but in that case we copied
+                // everyting over already.
+                cities_new.extend_from_slice(&self.cities[(new_segment_before + 1)..]);
+            }
+        } else {
+            // before_segment_start > after_segment_end, non-segment is in one part
+            debug_assert!(
+                new_segment_before <= before_segment_start
+                    && new_segment_before >= after_segment_end
+            );
+            if new_segment_before < before_segment_start {
+                // Copy after_segment_end..=new_segment_before, then copy segment,
+                // then copy new_segment_before..=before_segment_start
+                if reversed {
+                    // copy segment
+                } else {
+                    // copy segment
+                }
+            } else {
+                // new_segment_before > before_segment_start &&
+                // before_segment_start > after_segment_end -> new_segment_before is
+                // inside the segment, which is impossible.
+                unreachable!()
+            }
+        }
+
+        // TODO: fix this, it makes no sense to copy an empty range (FIX ABOVE)
         if new_segment_before > new_segment_after {
+            // new_segment_before is the last city in tour and new_segment_after
+            // is the first, therefore, the segment is empty.
             // Non-segment.
             cities_new.extend_from_slice(&self.cities[new_segment_after..=new_segment_before]);
             // Segment is in two parts.
@@ -338,13 +408,11 @@ impl Tour {
                     cities_new.extend(self.cities[..new_segment_after].iter().rev());
                     cities_new.extend(self.cities[new_segment_before + 1..].iter().rev());
                 }
+            } else if new_segment_before == self.number_of_cities() - 1 {
+                cities_new.extend_from_slice(&self.cities[..new_segment_after]);
             } else {
-                if new_segment_before == self.number_of_cities() - 1 {
-                    cities_new.extend_from_slice(&self.cities[..new_segment_after]);
-                } else {
-                    cities_new.extend_from_slice(&self.cities[new_segment_before + 1..]);
-                    cities_new.extend_from_slice(&self.cities[..new_segment_after]);
-                }
+                cities_new.extend_from_slice(&self.cities[new_segment_before + 1..]);
+                cities_new.extend_from_slice(&self.cities[..new_segment_after]);
             }
         } else {
             // new_segment_before < new_segment_after
