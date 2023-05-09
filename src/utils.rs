@@ -5,6 +5,9 @@ use mpi::{
     topology::{Process, SystemCommunicator},
     traits::{Communicator, Root},
 };
+use rand::distributions::Uniform;
+use rand::prelude::Distribution;
+use rand::Rng;
 
 // Returns (low, high).
 pub fn order<T: Ord>(a: T, b: T) -> (T, T) {
@@ -79,4 +82,13 @@ macro_rules! static_assert {
             }
         };
     };
+}
+
+pub fn choose_except<R: Rng>(distrib: Uniform<usize>, except: usize, rng: &mut R) -> usize {
+    loop {
+        let number = distrib.sample(rng);
+        if number != except {
+            return number;
+        }
+    }
 }

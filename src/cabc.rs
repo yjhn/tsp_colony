@@ -1,14 +1,21 @@
 //! Combinatorial artificial bee colony.
 
-use rand::Rng;
+use rand::{
+    distributions::{Uniform, WeightedIndex},
+    prelude::Distribution,
+    seq::SliceRandom,
+    Rng,
+};
 
 use crate::{
     bee::Bee,
     config::{DistanceT, Float},
+    gstm,
     index::CityIndex,
     matrix::Matrix,
     tour::Tour,
     tsp_problem::TspProblem,
+    utils::choose_except,
 };
 
 pub type NeighbourMatrix = Matrix<(CityIndex, DistanceT)>;
@@ -22,7 +29,7 @@ pub struct TourExt {
 
 impl TourExt {
     pub fn new(tour: Tour) -> Self {
-        let fitness = Self::fitness(&tour);
+        let fitness = Self::calc_fitness(&tour);
         Self {
             tour,
             non_improvement_iters: 0,
@@ -31,7 +38,7 @@ impl TourExt {
         }
     }
 
-    fn fitness(tour: &Tour) -> Float {
+    fn calc_fitness(tour: &Tour) -> Float {
         1.0 / (1.0 + tour.length() as Float)
     }
 
@@ -39,14 +46,21 @@ impl TourExt {
         self.prob_select_by_onlooker = (0.9 * self.fitness) / fit_best + 0.1;
     }
 
+    pub fn prob_select_by_onlooker(&self) -> Float {
+        debug_assert_ne!(self.prob_select_by_onlooker, 0.0);
+        self.prob_select_by_onlooker
+    }
+
     pub fn tour(&self) -> &Tour {
         &self.tour
     }
 
     pub fn set_tour(&mut self, tour: Tour) {
-        self.fitness = Self::fitness(&tour);
+        self.fitness = Self::calc_fitness(&tour);
         self.tour = tour;
         self.non_improvement_iters = 0;
+        // For debug purposes.
+        self.prob_select_by_onlooker = 0.0;
     }
 
     pub fn inc_non_improvement(&mut self) {
@@ -56,10 +70,14 @@ impl TourExt {
     pub fn non_improvement_iters(&self) -> u32 {
         self.non_improvement_iters
     }
+
+    pub fn fitness(&self) -> Float {
+        self.fitness
+    }
 }
 
 pub struct CombArtBeeColony<'a, R: Rng> {
-    bees: Vec<Bee>,
+    colony_size: usize,
     iteration: u32, // max iterations will be specified on method evolve_until_optimal
     tours: Vec<TourExt>,
     best_tour: Tour,
@@ -67,18 +85,24 @@ pub struct CombArtBeeColony<'a, R: Rng> {
     tsp_problem: &'a TspProblem,
     // Row i is neighbour list for city CityIndex(i).
     neighbour_lists: NeighbourMatrix,
+    p_cp: Float,
+    p_rc: Float,
+    p_l: Float,
     rng: &'a mut R,
 }
 
 impl<'a, R: Rng> CombArtBeeColony<'a, R> {
     pub fn new(
         tsp_problem: &'a TspProblem,
-        colony_size: u32,
+        colony_size: usize,
         nl_max: u16,
         capital_l: Float,
+        p_cp: Float,
+        p_rc: Float,
+        p_l: Float,
         rng: &'a mut R,
     ) -> Self {
-        let mut tours = Vec::with_capacity(colony_size as usize);
+        let mut tours = Vec::with_capacity(colony_size);
         let number_of_cities = tsp_problem.number_of_cities() as u16;
         let mut best_tour_idx = 0;
         let mut best_tour_length = DistanceT::MAX;
@@ -90,26 +114,29 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
             }
             tours.push(TourExt::new(tour));
         }
-        let best_tour = tours[best_tour_idx as usize].tour().clone();
+        let best_tour = tours[best_tour_idx].tour().clone();
         let neighbour_lists = tsp_problem.distances().neighbourhood_lists(nl_max);
         // Eq. 6 in qCABC paper.
         let tour_non_improvement_limit =
             (colony_size as Float * number_of_cities as Float) / capital_l;
 
         Self {
-            bees: (0..colony_size).map(|_| Bee::new()).collect(),
+            colony_size,
             iteration: 0,
             tours,
             best_tour,
             tour_non_improvement_limit: tour_non_improvement_limit as u32,
             tsp_problem,
             neighbour_lists,
+            p_cp,
+            p_rc,
+            p_l,
             rng,
         }
     }
 
     pub fn colony_size(&self) -> usize {
-        self.bees.len()
+        self.colony_size
     }
 
     pub fn iterate_until_optimal(&mut self, max_iterations: u32) -> bool {
@@ -117,16 +144,71 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
         // TODO: what is the split between employed bees and foragers (onlookers)?
         // For now we will assume that all bees are both foragers and onlookers.
         let mut found_optimal = false;
+        let distrib_tours = Uniform::new(0, self.colony_size).unwrap();
 
         loop {
             // Employed bees phase.
-            for bee in self.bees.iter() {
-                // bee.
+            for idx in 0..self.colony_size {
+                let v_i = gstm::generate_neighbour(
+                    self.tours[idx].tour(),
+                    self.tours[choose_except(distrib_tours, idx, self.rng)].tour(),
+                    self.rng,
+                    self.p_rc,
+                    self.p_cp,
+                    self.p_l,
+                    &self.neighbour_lists,
+                    self.tsp_problem.distances(),
+                );
+                if v_i.is_shorter_than(self.tours[idx].tour()) {
+                    self.tours[idx].set_tour(v_i);
+                }
             }
 
             // Onlooker (forager) bees phase.
 
+            // Calculate the probabilities of being selected by onlookers.
+            let fit_best = self
+                .tours
+                .iter()
+                .map(|t| (t.tour().length(), t.fitness()))
+                .min_by_key(|&(len, fit)| len)
+                .unwrap()
+                .1;
+            for t in self.tours.iter_mut() {
+                t.calc_set_prob_select(fit_best);
+            }
+
+            let distrib_weighted =
+                WeightedIndex::new(self.tours.iter().map(|t| t.prob_select_by_onlooker())).unwrap();
+            for idx in 0..self.colony_size {
+                let t_idx = distrib_weighted.sample(self.rng);
+                let t = &self.tours[t_idx];
+
+                let v_i = gstm::generate_neighbour(
+                    t.tour(),
+                    self.tours[choose_except(distrib_tours, idx, self.rng)].tour(),
+                    self.rng,
+                    self.p_rc,
+                    self.p_cp,
+                    self.p_l,
+                    &self.neighbour_lists,
+                    self.tsp_problem.distances(),
+                );
+                if v_i.is_shorter_than(t.tour()) {
+                    self.tours[t_idx].set_tour(v_i);
+                }
+            }
+
             // Scout phase.
+            for tour in self.tours.iter_mut() {
+                if tour.non_improvement_iters() == self.tour_non_improvement_limit {
+                    tour.set_tour(Tour::random(
+                        self.tsp_problem.number_of_cities() as u16,
+                        self.tsp_problem.distances(),
+                        self.rng,
+                    ));
+                }
+            }
 
             self.iteration += 1;
 
