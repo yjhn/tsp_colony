@@ -114,11 +114,11 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
             }
             tours.push(TourExt::new(tour));
         }
-        let best_tour = tours[best_tour_idx].tour().clone();
         let neighbour_lists = tsp_problem.distances().neighbourhood_lists(nl_max);
         // Eq. 6 in qCABC paper.
         let tour_non_improvement_limit =
             (colony_size as Float * number_of_cities as Float) / capital_l;
+        let best_tour = tours[best_tour_idx].tour().clone();
 
         Self {
             colony_size,
@@ -140,7 +140,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
     }
 
     pub fn iterate_until_optimal(&mut self, max_iterations: u32) -> bool {
-        let num_cities = self.number_of_cities();
+        let num_cities = self.number_of_cities() as u16;
         // TODO: what is the split between employed bees and foragers (onlookers)?
         // For now we will assume that all bees are both foragers and onlookers.
         let mut found_optimal = false;
@@ -200,19 +200,28 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
             }
 
             // Scout phase.
-            for tour in self.tours.iter_mut() {
+            // Also, update the best tour found so far.
+            let (mut best_tour_idx, mut best_tour_length) = (0, DistanceT::MAX);
+            for (idx, tour) in self.tours.iter_mut().enumerate() {
                 if tour.non_improvement_iters() == self.tour_non_improvement_limit {
                     tour.set_tour(Tour::random(
-                        self.tsp_problem.number_of_cities() as u16,
+                        num_cities,
                         self.tsp_problem.distances(),
                         self.rng,
                     ));
                 }
+                if tour.tour().length() < best_tour_length {
+                    best_tour_length = tour.tour().length();
+                    best_tour_idx = idx;
+                }
+            }
+            // New best could be longer, because if the best tour is not improved
+            // for some generations, it is replaced.
+            if best_tour_length < self.best_tour.length() {
+                self.best_tour = self.tours[best_tour_idx].tour().clone();
             }
 
             self.iteration += 1;
-
-            if self.iteration == max_iterations {}
 
             if self.best_tour.length() == self.tsp_problem.solution_length() {
                 eprintln!(
