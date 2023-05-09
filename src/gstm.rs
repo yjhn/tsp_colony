@@ -46,8 +46,6 @@ pub fn generate_neighbour<R: Rng>(
             let r1_neighbourhood_list = distances.neighbourhood_list(r1, nl_max);
             let r2_neighbourhood_list = distances.neighbourhood_list(r2, nl_max);
 
-            // TODO: repeat if the inversion has not taken place.
-            // if that is likely, we can just shuffle the neighbour lists before picking.
             // TODO: kaip suprantu, paliekam t_i nepakeistą, tik nl_r1 arba nl_r2 perkeliam kitur?
             let mut new_tour = t_i.clone();
             // Choose random neighbours.
@@ -78,8 +76,8 @@ pub fn generate_neighbour<R: Rng>(
     }
 }
 
-// TODO: maybe it has to not be a neighbour at all? qCABC article says "not preceding",
-// original paper doesn't say clearly.
+// Original GSTM paper says "not a neighbour", qCABC paper says "not preceding".
+// I implemented qCABC, so chose "not preceding".
 fn choose_non_preceding<R: Rng>(
     neighbourhood_list: &[(CityIndex, DistanceT)],
     rng: &mut R,

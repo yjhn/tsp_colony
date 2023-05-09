@@ -33,7 +33,7 @@ pub struct Args {
 
     #[arg(long, num_args(1..))]
     /// Multipliers for Q, which is related to the quantity of trail laid by ants.
-    /// Q is calculated as capital_q_mul * <largest length of the solutions in an iteration>
+    /// Q is calculated as capital_q_mul * \<largest length of the solutions in an iteration\>
     pub capital_q_muls: Option<Vec<Float>>,
 
     #[arg(long, num_args(1..))]

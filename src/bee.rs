@@ -7,8 +7,8 @@ use crate::{
     tour::{Tour, TourFunctions},
 };
 
-// Bees will not know which kind they are, it does not matter, they will
-// only expose methods for all bee types.
+// Bees will not know which kind they are, they will
+// expose methods for all bee types.
 pub struct Bee {}
 
 impl Bee {
