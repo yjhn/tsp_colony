@@ -432,6 +432,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "libm"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "348108ab3fba42ec82ff6e9564fc4ca0247bdccdc68dd8af9764bbc79c3c8ffb"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -522,6 +528,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "578ede34cf02f8924ab9447f50c28075b4d3e5b269972345e7e0372b38c6cdcd"
 dependencies = [
  "autocfg",
+ "libm",
 ]
 
 [[package]]
@@ -621,6 +628,15 @@ version = "0.7.0"
 source = "git+https://github.com/rust-random/rand#33a872a155e81d7ab5a9df3f9cd854dced021d0d"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "rand_distr"
+version = "0.5.0"
+source = "git+https://github.com/rust-random/rand#33a872a155e81d7ab5a9df3f9cd854dced021d0d"
+dependencies = [
+ "num-traits",
+ "rand",
 ]
 
 [[package]]
@@ -788,6 +804,7 @@ dependencies = [
  "iterator_ilp",
  "mpi",
  "rand",
+ "rand_distr",
  "serde",
  "serde_json",
  "strum",

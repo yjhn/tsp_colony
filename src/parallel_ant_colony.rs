@@ -10,6 +10,7 @@ use rand::{
     seq::SliceRandom,
     Rng, SeedableRng,
 };
+use rand_distr::WeightedAliasIndex;
 
 use crate::{
     ant::Ant,
@@ -305,6 +306,10 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         self.best_tour.remove_hack_length_cvg();
     }
 
+    // fn fill_city_selection_probs(&self, probs: &mut [Float]) {
+
+    // }
+
     fn construct_ant_tours(&mut self, distrib01: &Uniform<Float>) -> ShortLongIterationTours {
         let mut iteration_tours = ShortLongIterationTours {
             short_tour_ant_idx: 0,
@@ -316,6 +321,8 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         // Colony is stale if all ants find the same tour. Since actually
         // checking if tours match is expensive, we only check if they are
         // of the same length.
+        // TODO: we can use WeightedAliasIndex, it would probably be much faster.
+        // let city_chooser = WeightedAliasIndex::new()
         for (idx, ant) in self.ants.iter_mut().enumerate() {
             for _ in 1..num_cities {
                 ant.choose_next_city(self.rng, distrib01, &self.pheromone_matrix, self.alpha);
