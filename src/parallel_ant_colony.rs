@@ -150,9 +150,9 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         let mut delta_tau_matrix = SquareMatrix::new(num_cities, 0.0);
 
         let world_size = self.mpi.world_size as usize;
-        let mut cpu_random_order: Vec<usize> = (0..world_size).collect();
+        let mut other_cpus: Vec<usize> = (0..world_size).collect();
         // We will never exchange with ourselves.
-        cpu_random_order.swap_remove(self.mpi.rank as usize);
+        other_cpus.swap_remove(self.mpi.rank as usize);
         // Buffer for CPUs' best tours.
         // Tour::APPENDED_HACK_ELEMENTS extra spaces at the end ar for tour length and MPI rank.
         let mut cpus_best_tours_buf =
@@ -205,12 +205,8 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 // min_delta_tau = capital_q / shortest_tour_so_far as Float;
 
                 let neighbour_values = self.calculate_neighbour_values(&mut proc_distances);
-                let exchange_partner = self.select_exchange_partner(
-                    &fitness,
-                    &neighbour_values,
-                    &mut cpu_random_order,
-                    &distrib01,
-                );
+                let exchange_partner =
+                    self.select_exchange_partner(&fitness, &neighbour_values, &other_cpus);
                 // if self.mpi.is_root {
                 //     dbg!(&proc_distances);
                 // }
@@ -449,8 +445,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         &mut self,
         fitness: &[Float],
         neighbour_values: &[Float],
-        cpu_random_order: &mut [usize],
-        distrib01: &Uniform<Float>,
+        other_cpus: &[usize],
     ) -> usize {
         let rank = self.mpi.rank as usize;
         let mut denominator = 0.0;
@@ -462,17 +457,11 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
             denominator += Float::abs(self_neighbour - neighbour_values[i]) * fitness[i];
         }
 
-        cpu_random_order.shuffle(self.rng);
-        for i in cpu_random_order.iter().copied() {
-            let numerator = Float::abs(self_neighbour - neighbour_values[i]) * fitness[i];
-            let p = numerator / denominator;
-            if p > distrib01.sample(self.rng) {
-                return i;
-            }
-        }
-
-        // If no CPU is selected, choose a random one.
-        cpu_random_order[0]
+        *other_cpus
+            .choose_weighted(self.rng, |&cpu| {
+                (Float::abs(self_neighbour - neighbour_values[cpu]) * fitness[cpu]) / denominator
+            })
+            .unwrap()
     }
 
     fn update_pheromones_from_partner(
