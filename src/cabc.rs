@@ -2,12 +2,14 @@
 
 use std::ops::{Deref, DerefMut};
 
+use mpi::traits::CommunicatorCollectives;
 use rand::{
-    distributions::{Uniform, WeightedIndex},
+    distributions::{self, Uniform, WeightedIndex},
     prelude::Distribution,
     seq::SliceRandom,
     Rng,
 };
+use std::cmp::max;
 
 use crate::{
     config::{DistanceT, Float},
@@ -108,6 +110,9 @@ pub struct CombArtBeeColony<'a, R: Rng> {
     p_rc: Float,
     p_l: Float,
     r: Float,
+    lowercase_q: usize,
+    g: u32,
+    k: Float,
     rng: &'a mut R,
     mpi: &'a Mpi<'a>,
 }
@@ -122,6 +127,9 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
         p_rc: Float,
         p_l: Float,
         r: Float,
+        lowercase_q: usize,
+        initial_g: u32,
+        k: Float,
         rng: &'a mut R,
         mpi: &'a Mpi<'a>,
     ) -> Self {
@@ -159,6 +167,9 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
             p_rc,
             p_l,
             r,
+            lowercase_q,
+            g: initial_g,
+            k,
             rng,
             mpi,
         }
@@ -175,6 +186,23 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
         let mut found_optimal = false;
         let distrib_tours = Uniform::new(0, self.colony_size).unwrap();
         let mut tour_distances = SquareMatrix::new(self.tours.len(), 0);
+        let distrib01 = distributions::Uniform::new(0.0, 1.0).unwrap();
+
+        let world_size = self.mpi.world_size as usize;
+        // We will never exchange with ourselves.
+        let other_cpus: Vec<usize> = (0..world_size)
+            .filter(|&e| e != self.mpi.rank as usize)
+            .collect();
+        // Buffer for CPUs' best tours.
+        // Tour::APPENDED_HACK_ELEMENTS extra spaces at the end are for tour length.
+        let mut cpus_best_tours_buf =
+            vec![
+                CityIndex::new(0);
+                world_size * (self.number_of_cities() + Tour::APPENDED_HACK_ELEMENTS)
+            ];
+        let mut proc_distances = SquareMatrix::new(world_size, 0);
+        // let mut min_delta_tau = config::MIN_DELTA_TAU_INIT;
+        let mut last_exchange = self.iteration;
 
         loop {
             // Employed bees phase.
@@ -321,5 +349,71 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
         if best_tour_length < self.best_tour.length() {
             self.best_tour = self.tours[best_tour_idx].tour().clone();
         }
+    }
+
+    fn exchange_best_tours(&mut self, recv_buf: &mut [CityIndex]) {
+        let cvg = self.path_usage_matrix.convergence();
+        // self.best_tour.hack_append_length(self.mpi.rank);
+        self.best_tour.hack_append_length_cvg(cvg);
+        self.mpi
+            .world
+            .all_gather_into(self.best_tour.cities(), recv_buf);
+        self.best_tour.remove_hack_length_cvg();
+    }
+
+    /// Returns best tour index and its length.
+    fn global_best_tour_length(&self, cpus_best_tours_buf: &[CityIndex]) -> (usize, DistanceT) {
+        let chunk_size = self.number_of_cities() + Tour::APPENDED_HACK_ELEMENTS;
+
+        cpus_best_tours_buf
+            .chunks_exact(chunk_size)
+            .map(TourFunctions::get_hack_tour_length)
+            .enumerate()
+            .fold(
+                (0, DistanceT::MAX),
+                |(best_tour_idx, best_tour_length), (idx, tour_with_hacks_len)| {
+                    if tour_with_hacks_len < best_tour_length {
+                        (idx, tour_with_hacks_len)
+                    } else {
+                        (best_tour_idx, best_tour_length)
+                    }
+                },
+            )
+    }
+
+    fn set_exchange_interval(&mut self, cvg_avg: Float) {
+        if cvg_avg >= 0.8 || cvg_avg <= 0.2 {
+            let new_g = self.g as Float + ((0.5 - cvg_avg) * self.k as Float);
+            debug_assert!(new_g >= 0.0);
+            self.g = max(new_g as u32, 1);
+        }
+    }
+
+    fn cvg_avg(&self, cpus_best_tours_buf: &[CityIndex]) -> Float {
+        let chunk_size = self.number_of_cities() + Tour::APPENDED_HACK_ELEMENTS;
+        debug_assert_eq!(cpus_best_tours_buf.len() % chunk_size, 0);
+        debug_assert_eq!(
+            cpus_best_tours_buf.len() / chunk_size,
+            self.mpi.world_size as usize
+        );
+
+        let cvg_sum: Float = cpus_best_tours_buf
+            .chunks_exact(chunk_size)
+            .map(TourFunctions::get_hack_cvg)
+            .sum();
+
+        cvg_sum / self.mpi.world_size as Float
+    }
+
+    pub fn iteration(&self) -> u32 {
+        self.iteration
+    }
+
+    pub fn best_tour(&self) -> &Tour {
+        &self.best_tour
+    }
+
+    pub fn set_lowercase_q(&mut self, q: usize) {
+        self.lowercase_q = q;
     }
 }

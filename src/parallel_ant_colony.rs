@@ -150,11 +150,12 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         let mut delta_tau_matrix = SquareMatrix::new(num_cities, 0.0);
 
         let world_size = self.mpi.world_size as usize;
-        let mut other_cpus: Vec<usize> = (0..world_size).collect();
         // We will never exchange with ourselves.
-        other_cpus.swap_remove(self.mpi.rank as usize);
+        let other_cpus: Vec<usize> = (0..world_size)
+            .filter(|&e| e != self.mpi.rank as usize)
+            .collect();
         // Buffer for CPUs' best tours.
-        // Tour::APPENDED_HACK_ELEMENTS extra spaces at the end ar for tour length and MPI rank.
+        // Tour::APPENDED_HACK_ELEMENTS extra spaces at the end are for tour length.
         let mut cpus_best_tours_buf =
             vec![CityIndex::new(0); world_size * (num_cities + Tour::APPENDED_HACK_ELEMENTS)];
         let mut proc_distances = SquareMatrix::new(world_size, 0);
