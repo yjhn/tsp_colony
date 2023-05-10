@@ -8,7 +8,6 @@ use rand::{
 };
 
 use crate::{
-    bee::Bee,
     config::{DistanceT, Float},
     gstm,
     index::CityIndex,

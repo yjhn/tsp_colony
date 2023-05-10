@@ -2,7 +2,6 @@
 
 mod ant;
 mod arguments;
-mod bee;
 mod benchmark;
 mod cabc;
 mod config;
