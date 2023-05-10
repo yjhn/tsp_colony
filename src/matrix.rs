@@ -39,6 +39,10 @@ where
     pub fn row(&self, y: usize) -> &[T] {
         &self.data[(self.side_length * y)..(self.side_length * (y + 1))]
     }
+
+    pub fn data(&self) -> &[T] {
+        &self.data
+    }
 }
 
 impl<T> Index<(usize, usize)> for SquareMatrix<T>
