@@ -94,7 +94,7 @@ fn choose_non_preceding<R: Rng>(
     }
 }
 
-/// Returns (before_t_star_i, after_t_star_i).
+/// Returns (`before_t_star_i`, `after_t_star_i`).
 fn select_subtour<R: Rng>(
     t_i: &[CityIndex],
     t_k: &[CityIndex],

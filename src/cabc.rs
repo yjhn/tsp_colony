@@ -207,7 +207,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
         self.tsp_problem.number_of_cities()
     }
 
-    /// Mean distance of x_i to all the other tours.
+    /// Mean distance of `x_i` to all the other tours.
     // TODO: qCABC paper 9 formulėje klaida, ten reikia, kad m != i (nors tai nieko
     // nekeičia, atstumas iki savęs = 0).
     fn md_i(&self, i: usize, tour_distances: &SquareMatrix<u16>) -> Float {
