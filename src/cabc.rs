@@ -14,6 +14,7 @@ use crate::{
     gstm,
     index::CityIndex,
     matrix::{Matrix, SquareMatrix},
+    path_usage_matrix::PathUsageMatrix,
     tour::{Tour, TourFunctions},
     tsp_problem::TspProblem,
     utils::choose_except,
@@ -56,8 +57,10 @@ impl TourExt {
         &self.tour
     }
 
-    pub fn set_tour(&mut self, tour: Tour) {
+    pub fn set_tour(&mut self, tour: Tour, path_usage_matrix: &mut PathUsageMatrix) {
         self.fitness = Self::calc_fitness(&tour);
+        path_usage_matrix.dec_tour_paths(&self.tour);
+        path_usage_matrix.inc_tour_paths(&tour);
         self.tour = tour;
         self.non_improvement_iters = 0;
         // For debug purposes.
@@ -85,11 +88,11 @@ impl Deref for TourExt {
     }
 }
 
-impl DerefMut for TourExt {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.tour
-    }
-}
+// impl DerefMut for TourExt {
+//     fn deref_mut(&mut self) -> &mut Self::Target {
+//         &mut self.tour
+//     }
+// }
 
 pub struct CombArtBeeColony<'a, R: Rng> {
     colony_size: usize,
@@ -100,6 +103,7 @@ pub struct CombArtBeeColony<'a, R: Rng> {
     tsp_problem: &'a TspProblem,
     // Row i is neighbour list for city CityIndex(i).
     neighbour_lists: NeighbourMatrix,
+    path_usage_matrix: PathUsageMatrix, // used for parallelization only
     p_cp: Float,
     p_rc: Float,
     p_l: Float,
@@ -121,6 +125,8 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
     ) -> Self {
         let mut tours = Vec::with_capacity(colony_size);
         let number_of_cities = tsp_problem.number_of_cities() as u16;
+        let mut path_usage_matrix = PathUsageMatrix::new(number_of_cities);
+
         let mut best_tour_idx = 0;
         let mut best_tour_length = DistanceT::MAX;
         for i in 0..colony_size {
@@ -129,6 +135,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
                 best_tour_length = tour.length();
                 best_tour_idx = i;
             }
+            path_usage_matrix.inc_tour_paths(&tour);
             tours.push(TourExt::new(tour));
         }
         let neighbour_lists = tsp_problem.distances().neighbourhood_lists(nl_max);
@@ -145,6 +152,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
             tour_non_improvement_limit: tour_non_improvement_limit as u32,
             tsp_problem,
             neighbour_lists,
+            path_usage_matrix,
             p_cp,
             p_rc,
             p_l,
@@ -203,22 +211,15 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
     // TODO: qCABC paper 9 formulėje klaida, ten reikia, kad m != i (nors tai nieko
     // nekeičia, atstumas iki savęs = 0).
     fn md_i(&self, i: usize, tour_distances: &SquareMatrix<u16>) -> Float {
-        let sum_d: u32 = tour_distances
-            .row(i)
-            .iter()
-            .copied()
-            .map(|d| u32::from(d))
-            .sum();
+        let sum_d: u32 = tour_distances.row(i).iter().copied().map(u32::from).sum();
 
         sum_d as Float / (self.tours.len() - 1) as Float
     }
 
-    fn fill_neighbours(&self, i: usize, buf: &mut Vec<usize>, tour_distances: &SquareMatrix<u16>) {}
-
     fn fill_tour_distance_matrix(&self, matrix: &mut SquareMatrix<u16>) {
         for (x, tour1) in self.tours.iter().enumerate() {
             for (y, tour2) in self.tours.iter().enumerate().take(x) {
-                let dist = tour1.distance(&tour2) as u16;
+                let dist = tour1.distance(tour2) as u16;
                 matrix[(x, y)] = dist;
                 matrix[(y, x)] = dist;
             }
@@ -238,7 +239,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
                 self.tsp_problem.distances(),
             );
             if v_i.is_shorter_than(&self.tours[idx]) {
-                self.tours[idx].set_tour(v_i);
+                self.tours[idx].set_tour(v_i, &mut self.path_usage_matrix);
             }
         }
 
@@ -266,7 +267,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
 
         for _ in 0..self.colony_size {
             let t_idx = distrib_weighted.sample(self.rng);
-            let threshold = self.r * self.md_i(t_idx, &tour_distances);
+            let threshold = self.r * self.md_i(t_idx, tour_distances);
 
             let (best_neighbour_idx, best_neighbour_length) = tour_distances
                 .row(t_idx)
@@ -291,7 +292,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
                 self.tsp_problem.distances(),
             );
             if v_i.length() < best_neighbour_length {
-                self.tours[best_neighbour_idx].set_tour(v_i);
+                self.tours[best_neighbour_idx].set_tour(v_i, &mut self.path_usage_matrix);
             }
         }
     }
@@ -302,11 +303,10 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
         let (mut best_tour_idx, mut best_tour_length) = (0, DistanceT::MAX);
         for (idx, tour) in self.tours.iter_mut().enumerate() {
             if tour.non_improvement_iters() == self.tour_non_improvement_limit {
-                tour.set_tour(Tour::random(
-                    num_cities,
-                    self.tsp_problem.distances(),
-                    self.rng,
-                ));
+                tour.set_tour(
+                    Tour::random(num_cities, self.tsp_problem.distances(), self.rng),
+                    &mut self.path_usage_matrix,
+                );
             }
             if tour.length() < best_tour_length {
                 best_tour_length = tour.length();

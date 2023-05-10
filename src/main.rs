@@ -10,6 +10,7 @@ mod gstm;
 mod index;
 mod matrix;
 mod parallel_ant_colony;
+mod path_usage_matrix;
 mod pheromone_visibility_matrix;
 mod tour;
 mod tsp_problem;
