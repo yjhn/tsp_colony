@@ -408,8 +408,8 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 // };
                 let distance = best_tour_with_hacks_appended_1[..num_cities]
                     .distance(&best_tour_with_hacks_appended_2[..num_cities]);
-                proc_distances[(x, y)] = distance;
-                proc_distances[(y, x)] = distance;
+                proc_distances[(x, y)] = distance as u16;
+                proc_distances[(y, x)] = distance as u16;
                 // Distance calculation needs to ignore the appended length and rank.
                 // proc_distances.push(CpuDistance {
                 // cpu1,

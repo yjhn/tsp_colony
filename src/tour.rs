@@ -476,7 +476,7 @@ pub trait TourFunctions {
 
     fn has_path(&self, x: CityIndex, y: CityIndex) -> bool;
 
-    fn distance(&self, other: &[CityIndex]) -> u16;
+    fn distance(&self, other: &[CityIndex]) -> usize;
 
     fn update_pheromone(&self, delta_tau_matrix: &mut SquareMatrix<Float>, delta_tau: Float);
 
@@ -634,17 +634,22 @@ impl TourFunctions for [CityIndex] {
 
     /// Returns the number of paths (edges) in one tour that are not in other.
     /// Both tours must have the same number of cities.
-    fn distance(&self, other: &[CityIndex]) -> u16 {
+    // TODO: this is not strictly the same as defined in PACO paper:
+    // there it only considers paths tht are in th sme direction (a -> b is not
+    // the same as b -> a). Was it intentional, or did they forget to specify
+    // that both ways are allowed?
+    // But this is exactly as specified in qCABC paper.
+    fn distance(&self, other: &[CityIndex]) -> usize {
         debug_assert_eq!(self.len(), other.len());
 
         // City count and path count is the same.
-        let num_cities = self.len() as u16;
+        let num_cities = self.len();
         let mut common_edges = 0;
         for pair in self.paths() {
             let &[c1, c2] = pair else { unreachable!() };
-            common_edges += other.has_path(c1, c2) as u16;
+            common_edges += other.has_path(c1, c2) as usize;
         }
-        common_edges += other.has_path(self[0], *self.last().unwrap()) as u16;
+        common_edges += other.has_path(self[0], *self.last().unwrap()) as usize;
 
         num_cities - common_edges
     }

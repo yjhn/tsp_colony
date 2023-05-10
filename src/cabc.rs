@@ -1,5 +1,7 @@
 //! Combinatorial artificial bee colony.
 
+use std::ops::{Deref, DerefMut};
+
 use rand::{
     distributions::{Uniform, WeightedIndex},
     prelude::Distribution,
@@ -12,7 +14,7 @@ use crate::{
     gstm,
     index::CityIndex,
     matrix::Matrix,
-    tour::Tour,
+    tour::{Tour, TourFunctions},
     tsp_problem::TspProblem,
     utils::choose_except,
 };
@@ -72,6 +74,20 @@ impl TourExt {
 
     pub fn fitness(&self) -> Float {
         self.fitness
+    }
+}
+
+impl Deref for TourExt {
+    type Target = Tour;
+
+    fn deref(&self) -> &Self::Target {
+        &self.tour
+    }
+}
+
+impl DerefMut for TourExt {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.tour
     }
 }
 
@@ -149,8 +165,8 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
             // Employed bees phase.
             for idx in 0..self.colony_size {
                 let v_i = gstm::generate_neighbour(
-                    self.tours[idx].tour(),
-                    self.tours[choose_except(distrib_tours, idx, self.rng)].tour(),
+                    &self.tours[idx],
+                    &self.tours[choose_except(distrib_tours, idx, self.rng)],
                     self.rng,
                     self.p_rc,
                     self.p_cp,
@@ -158,7 +174,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
                     &self.neighbour_lists,
                     self.tsp_problem.distances(),
                 );
-                if v_i.is_shorter_than(self.tours[idx].tour()) {
+                if v_i.is_shorter_than(&self.tours[idx]) {
                     self.tours[idx].set_tour(v_i);
                 }
             }
@@ -169,7 +185,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
             let fit_best = self
                 .tours
                 .iter()
-                .map(|t| (t.tour().length(), t.fitness()))
+                .map(|t| (t.length(), t.fitness()))
                 .min_by_key(|&(len, fit)| len)
                 .unwrap()
                 .1;
@@ -184,8 +200,8 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
                 let t = &self.tours[t_idx];
 
                 let v_i = gstm::generate_neighbour(
-                    t.tour(),
-                    self.tours[choose_except(distrib_tours, idx, self.rng)].tour(),
+                    t,
+                    &self.tours[choose_except(distrib_tours, idx, self.rng)],
                     self.rng,
                     self.p_rc,
                     self.p_cp,
@@ -193,7 +209,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
                     &self.neighbour_lists,
                     self.tsp_problem.distances(),
                 );
-                if v_i.is_shorter_than(t.tour()) {
+                if v_i.is_shorter_than(t) {
                     self.tours[t_idx].set_tour(v_i);
                 }
             }
@@ -209,8 +225,8 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
                         self.rng,
                     ));
                 }
-                if tour.tour().length() < best_tour_length {
-                    best_tour_length = tour.tour().length();
+                if tour.length() < best_tour_length {
+                    best_tour_length = tour.length();
                     best_tour_idx = idx;
                 }
             }
@@ -242,5 +258,18 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
 
     pub fn number_of_cities(&self) -> usize {
         self.tsp_problem.number_of_cities()
+    }
+
+    /// Mean distance of x_i to all the other tours.
+    // TODO: qCABC paper 9 formulėje klaida, ten reikia, kad m != i.
+    fn md_i(&self, i: usize) -> Float {
+        let sum_d: usize = self
+            .tours
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, t)| (idx != i).then(|| self.tours[i].distance(t)))
+            .sum();
+
+        sum_d as Float / (self.tours.len() - 1) as Float
     }
 }
