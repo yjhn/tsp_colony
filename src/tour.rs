@@ -647,9 +647,9 @@ impl TourFunctions for [CityIndex] {
         let mut common_edges = 0;
         for pair in self.paths() {
             let &[c1, c2] = pair else { unreachable!() };
-            common_edges += other.has_path(c1, c2) as usize;
+            common_edges += usize::from(other.has_path(c1, c2));
         }
-        common_edges += other.has_path(self[0], *self.last().unwrap()) as usize;
+        common_edges += usize::from(other.has_path(self[0], *self.last().unwrap()));
 
         num_cities - common_edges
     }

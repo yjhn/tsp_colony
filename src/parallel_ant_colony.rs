@@ -165,7 +165,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
             // TODO: gal precomputint pheromone.powf(alpha)? Vis tiek jis keičiasi tik kitoje iteracijoje.
             // Each ant constructs a tour, keep track of the shortest and longest tours
             // found in this iteration.
-            let iteration_tours = self.construct_ant_tours(&distrib01);
+            let iteration_tours = self.construct_ant_tours(distrib01);
 
             // Keep track of the shortest tour.
             if iteration_tours.short_tour_length < self.best_tour.length() {
@@ -309,7 +309,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
 
     // }
 
-    fn construct_ant_tours(&mut self, distrib01: &Uniform<Float>) -> ShortLongIterationTours {
+    fn construct_ant_tours(&mut self, distrib01: Uniform<Float>) -> ShortLongIterationTours {
         let mut iteration_tours = ShortLongIterationTours {
             short_tour_ant_idx: 0,
             short_tour_length: DistanceT::MAX,
@@ -438,7 +438,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
             row.sort_unstable();
 
             // First element is going to be 0 since it is distance to self.
-            let neighbour: Float = row[1..].iter().take(self.lowercase_q).sum::<u16>() as Float
+            let neighbour: Float = Float::from(row[1..].iter().take(self.lowercase_q).sum::<u16>())
                 / self.lowercase_q as Float;
             neighbour_values.push(neighbour);
         }
@@ -536,7 +536,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
 
         let cvg_sum: Float = cpus_best_tours_buf
             .chunks_exact(chunk_size)
-            .map(|tour_with_hacks| tour_with_hacks.get_hack_cvg())
+            .map(TourFunctions::get_hack_cvg)
             .sum();
 
         cvg_sum / self.mpi.world_size as Float
@@ -548,7 +548,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
 
         cpus_best_tours_buf
             .chunks_exact(chunk_size)
-            .map(|tour_with_hacks| tour_with_hacks.get_hack_tour_length())
+            .map(TourFunctions::get_hack_tour_length)
             .enumerate()
             .fold(
                 (0, DistanceT::MAX),

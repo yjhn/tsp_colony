@@ -40,7 +40,7 @@ impl TspProblem {
 
     pub fn from_file(path: impl AsRef<Path>) -> TspProblem {
         let tsp = TspBuilder::parse_path(path).unwrap();
-        let name = tsp.name().to_owned();
+        let name = tsp.name().clone();
         // a280 has two identical cities (171 and 172), so it needs special treatment.
         // For simplicity, disallow it.
         assert_ne!(
@@ -49,9 +49,10 @@ impl TspProblem {
         );
         let number_of_cities = tsp.dim();
         // CityIndex is a u16, so we cannot have more cities.
-        if number_of_cities > u16::MAX as usize {
-            panic!("Number of cities cannot be greater than 16384, is {number_of_cities}");
-        }
+        assert!(
+            number_of_cities <= usize::from(u16::MAX),
+            "Number of cities cannot be greater than 16384, is {number_of_cities}"
+        );
         let cities = {
             let coord_map = tsp.node_coords();
             let mut cities = Vec::with_capacity(number_of_cities);
@@ -124,7 +125,7 @@ impl TspProblem {
                     WeightKind::Geo => dist_f64 as u32,
                     WeightKind::Att => {
                         let d = nint(dist_f64);
-                        if (d as f64) < dist_f64 {
+                        if (f64::from(d)) < dist_f64 {
                             d + 1
                         } else {
                             d

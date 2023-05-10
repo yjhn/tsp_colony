@@ -88,7 +88,7 @@ impl Ant {
     pub fn choose_next_city<R: Rng + SeedableRng>(
         &mut self,
         rng: &mut R,
-        distrib: &Uniform<Float>,
+        distrib: Uniform<Float>,
         matrix: &PheromoneVisibilityMatrix,
         alpha: Float,
     ) {

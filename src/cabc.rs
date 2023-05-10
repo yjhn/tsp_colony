@@ -141,7 +141,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
         let neighbour_lists = tsp_problem.distances().neighbourhood_lists(nl_max);
         // Eq. 6 in qCABC paper.
         let tour_non_improvement_limit =
-            (colony_size as Float * number_of_cities as Float) / capital_l;
+            (colony_size as Float * Float::from(number_of_cities)) / capital_l;
         let best_tour = tours[best_tour_idx].tour().clone();
 
         Self {
@@ -262,7 +262,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
         distrib_tours: Uniform<usize>,
     ) {
         let distrib_weighted =
-            WeightedIndex::new(self.tours.iter().map(|t| t.prob_select_by_onlooker())).unwrap();
+            WeightedIndex::new(self.tours.iter().map(TourExt::prob_select_by_onlooker)).unwrap();
         self.fill_tour_distance_matrix(tour_distances);
 
         for _ in 0..self.colony_size {
@@ -275,7 +275,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
                 .copied()
                 .enumerate()
                 .filter_map(|(i, dist)| {
-                    (dist as Float <= threshold).then(|| (i, self.tours[i].length()))
+                    (Float::from(dist) <= threshold).then(|| (i, self.tours[i].length()))
                 })
                 .min_by_key(|&(i, length)| length)
                 .unwrap();
