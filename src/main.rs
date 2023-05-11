@@ -22,6 +22,7 @@ use std::process;
 use crate::{
     arguments::{Args, PopulationSizes},
     benchmark::benchmark_ant_cycle,
+    config::paco,
     utils::Mpi,
 };
 use clap::Parser;
@@ -60,16 +61,16 @@ fn main() {
         arguments::Args::try_parse().unwrap_or_else(|_e| process::exit(2))
     };
 
-    let alphas = args.alphas.unwrap_or_else(|| vec![config::ALPHA]);
-    let betas = args.betas.unwrap_or_else(|| vec![config::BETA]);
-    let ros = args.ros.unwrap_or_else(|| vec![config::RO]);
+    let alphas = args.alphas.unwrap_or_else(|| vec![paco::ALPHA]);
+    let betas = args.betas.unwrap_or_else(|| vec![paco::BETA]);
+    let ros = args.ros.unwrap_or_else(|| vec![paco::RO]);
 
     let capital_q_muls = args
         .capital_q_muls
-        .unwrap_or_else(|| vec![config::CAPITAL_Q_MULTIPLIER]);
+        .unwrap_or_else(|| vec![config::paco::CAPITAL_Q_MULTIPLIER]);
     let init_intensities = args
         .init_intensities
-        .unwrap_or_else(|| vec![config::INITIAL_TRAIL_INTENSITY]);
+        .unwrap_or_else(|| vec![paco::INITIAL_TRAIL_INTENSITY]);
     let lowercase_qs = args
         .lowercase_qs
         .unwrap_or_else(|| vec![config::LOWERCASE_Q]);
