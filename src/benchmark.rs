@@ -456,7 +456,7 @@ pub fn benchmark_qcabc<PD, R>(
                                                                 optimal_length: problem
                                                                     .solution_length(),
                                                             },
-                                                            algorithm: "PACO",
+                                                            algorithm: "parallel qCABC",
                                                             algorithm_constants: QcabcConstants {
                                                                 colony_size,
                                                                 max_iterations,

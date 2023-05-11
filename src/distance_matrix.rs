@@ -42,27 +42,26 @@ impl DistanceMatrix {
             // table. Then sort the row by distance, skip first (0 distance to self)
             // and take the required amount.
             let city = city_idx;
-            let mut nl_iter = self
+            let mut neighbours: Vec<(CityIndex, DistanceT)> = self
                 .0
                 .row(city)
                 .iter()
                 .copied()
                 .enumerate()
                 .map(|(idx, dist)| (CityIndex::new(idx as u16), dist))
-                .take(usize::from(size + 1));
+                .collect();
+            neighbours.sort_unstable_by_key(|&(idx, dist)| dist);
             // Copy neighbours to slice.
-            let mut skipped = false;
-            for elem in nl_iter {
-                // Do not add self as a neighbour.
-                if usize::from(elem.0) == city_idx {
-                    skipped = true;
-                    continue;
-                }
+            for (elem, place_in_row) in neighbours
+                .iter()
+                .copied()
+                .skip(1)
+                .take(usize::from(size + 1))
+                .zip(row)
+            {
                 // After we have skipped self, indexes will be off by +1.
-                row[usize::from(elem.0) - usize::from(skipped)] = elem;
+                *place_in_row = elem;
             }
-
-            row.sort_unstable_by_key(|&(idx, dist)| dist);
         }
 
         matrix
