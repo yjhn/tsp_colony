@@ -3,7 +3,6 @@
 mod ant;
 mod arguments;
 mod benchmark;
-mod cabc;
 mod config;
 mod distance_matrix;
 mod gstm;
@@ -12,6 +11,7 @@ mod matrix;
 mod parallel_ant_colony;
 mod path_usage_matrix;
 mod pheromone_visibility_matrix;
+mod qcabc;
 mod tour;
 mod tsp_problem;
 mod tsplib;
