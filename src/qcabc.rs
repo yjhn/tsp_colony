@@ -154,7 +154,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
                 best_tour_idx = i;
             } else if tour.length() > worst_tour_length {
                 worst_tour_idx = i;
-                worst_tour_length - tour.length();
+                worst_tour_length = tour.length();
             }
             path_usage_matrix.inc_tour_paths(&tour);
             tours.push(TourExt::new(tour));
@@ -163,7 +163,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         // Eq. 6 in qCABC paper.
         let tour_non_improvement_limit =
             (colony_size as Float * Float::from(number_of_cities)) / capital_l;
-        let best_tour = tours[best_tour_idx as usize].tour().clone();
+        let best_tour = tours[best_tour_idx].tour().clone();
 
         Self {
             colony_size,

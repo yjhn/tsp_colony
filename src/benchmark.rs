@@ -335,6 +335,7 @@ struct QcabcConstants {
     l_min: usize,
     l_max: usize,
     r: Float,
+    capital_l: Float,
     lowercase_q: usize,
     initial_g: u32,
     k: Float,
@@ -353,6 +354,7 @@ pub fn benchmark_qcabc<PD, R>(
     p_ls: &[Float],
     l_mins: &[usize],
     l_maxs: &[usize],
+    capital_ls: &[Float],
     rs: &[Float],
     lowercase_qs: &[usize],
     initial_gs: &[u32],
@@ -395,159 +397,167 @@ pub fn benchmark_qcabc<PD, R>(
                                         for lowercase_q in lowercase_qs.iter().copied() {
                                             for initial_g in initial_gs.iter().copied() {
                                                 for k in ks.iter().copied() {
-                                                    let mut qcabc = QuickCombArtBeeColony::new(
-                                                        &problem,
-                                                        colony_size,
-                                                        nl_max,
-                                                        capital_l,
-                                                        p_cp,
-                                                        p_rc,
-                                                        p_l,
-                                                        l_min,
-                                                        l_max,
-                                                        r,
-                                                        lowercase_q,
-                                                        initial_g,
-                                                        k,
-                                                        &mut rng,
-                                                        mpi,
-                                                    );
-                                                    // Figure out where to save the results.
-                                                    let mut skip = [false];
-                                                    let save_file_path = if mpi.is_root {
-                                                        let mut save_file_path = format!(
-                                        "{dir}/bm_qcabc_{name}_{cpus}cpus_cs{cs}_nlmax{nlmax}_pcp{pcp}_prc{prc}_pl{pl}_lmin{lmin}_lmax{lmax}_r{r}_q{q}_g{g}_k{k}.json",
-                                        dir=results_dir, name=problem.name(), cpus=process_count,cs=colony_size, nlmax=nl_max, pcp=p_cp, prc=p_rc, pl=p_l, lmin=l_min, lmax=l_max, r=r, q=lowercase_q, g=initial_g, k=k                                     );
-                                                        match get_output_file_path(
-                                                            &mut save_file_path,
-                                                            results_dir,
-                                                            duplicate_handling,
-                                                        ) {
-                                                            BenchAction::Continue => (),
-                                                            BenchAction::SkipBench => {
-                                                                skip[0] = true
-                                                            }
-                                                            BenchAction::Abort => {
-                                                                mpi.world.abort(1)
-                                                            }
-                                                        };
-                                                        save_file_path
-                                                    } else {
-                                                        String::new()
-                                                    };
-                                                    mpi.root_process.broadcast_into(&mut skip);
-                                                    if skip[0] {
-                                                        continue;
-                                                    }
-
-                                                    // Run and time the benchmark.
-                                                    let mut run_results = Vec::new();
-                                                    let bench_start_absolute = SystemTime::now();
-                                                    let bench_start = Instant::now();
-
-                                                    let bench_config = BenchmarkConfig {
-                                                        process_count,
-                                                        problem: ShortProblemDesc {
-                                                            name: problem.name(),
-                                                            optimal_length: problem
-                                                                .solution_length(),
-                                                        },
-                                                        algorithm: "PACO",
-                                                        algorithm_constants: QcabcConstants {
-                                                            colony_size,
-                                                            max_iterations,
-                                                            lowercase_q,
-                                                            initial_g,
-                                                            k,
-                                                            l_min,
-                                                            l_max,
+                                                    for capital_l in capital_ls.iter().copied() {
+                                                        let mut qcabc = QuickCombArtBeeColony::new(
+                                                            &problem,
+                                                            colony_size as usize,
+                                                            nl_max,
+                                                            capital_l,
                                                             p_cp,
                                                             p_rc,
                                                             p_l,
-                                                            nl_max,
+                                                            l_min,
+                                                            l_max,
                                                             r,
-                                                        },
-                                                        repeat_times,
-                                                    };
-
-                                                    if mpi.is_root {
-                                                        eprintln!(
-                                                            "{}",
-                                                            serde_json::to_string_pretty(
-                                                                &bench_config
-                                                            )
-                                                            .unwrap()
+                                                            lowercase_q,
+                                                            initial_g,
+                                                            k,
+                                                            &mut rng,
+                                                            mpi,
                                                         );
-                                                    }
-
-                                                    for run_number in 0..repeat_times {
-                                                        // for run_number in 0.. {
-                                                        let run_start = Instant::now();
-
-                                                        // todo!("Benchmark logic goes here");
-                                                        let found_optimal_tour = ant_cycle
-                                                            .iterate_until_optimal(max_iterations);
-                                                        // Needed returns: found_optimal, shortest_found (per getter), iteration_reached (galima paimti per getter)
-                                                        if mpi.is_root {
-                                                            let run_duration = run_start.elapsed();
-                                                            let result = RunResult {
-                                                                run_number,
-                                                                found_optimal_tour,
-                                                                shortest_found_tour: ant_cycle
-                                                                    .best_tour()
-                                                                    .length(),
-                                                                iteration_reached: ant_cycle
-                                                                    .iteration(),
-                                                                duration_millis: run_duration
-                                                                    .as_millis(),
+                                                        // Figure out where to save the results.
+                                                        let mut skip = [false];
+                                                        let save_file_path = if mpi.is_root {
+                                                            let mut save_file_path = format!(
+                                        "{dir}/bm_qcabc_{name}_{cpus}cpus_cs{cs}_nlmax{nlmax}_pcp{pcp}_prc{prc}_pl{pl}_lmin{lmin}_lmax{lmax}_r{r}_q{q}_g{g}_k{k}.json",
+                                        dir=results_dir, name=problem.name(), cpus=process_count,cs=colony_size, nlmax=nl_max, pcp=p_cp, prc=p_rc, pl=p_l, lmin=l_min, lmax=l_max, r=r, q=lowercase_q, g=initial_g, k=k                                     );
+                                                            match get_output_file_path(
+                                                                &mut save_file_path,
+                                                                results_dir,
+                                                                duplicate_handling,
+                                                            ) {
+                                                                BenchAction::Continue => (),
+                                                                BenchAction::SkipBench => {
+                                                                    skip[0] = true
+                                                                }
+                                                                BenchAction::Abort => {
+                                                                    mpi.world.abort(1)
+                                                                }
                                                             };
+                                                            save_file_path
+                                                        } else {
+                                                            String::new()
+                                                        };
+                                                        mpi.root_process.broadcast_into(&mut skip);
+                                                        if skip[0] {
+                                                            continue;
+                                                        }
 
-                                                            // Dump partial results in case the benchmark is killed before completing all the runs.
+                                                        // Run and time the benchmark.
+                                                        let mut run_results = Vec::new();
+                                                        let bench_start_absolute =
+                                                            SystemTime::now();
+                                                        let bench_start = Instant::now();
+
+                                                        let bench_config = BenchmarkConfig {
+                                                            process_count,
+                                                            problem: ShortProblemDesc {
+                                                                name: problem.name(),
+                                                                optimal_length: problem
+                                                                    .solution_length(),
+                                                            },
+                                                            algorithm: "PACO",
+                                                            algorithm_constants: QcabcConstants {
+                                                                colony_size,
+                                                                max_iterations,
+                                                                lowercase_q,
+                                                                initial_g,
+                                                                k,
+                                                                l_min,
+                                                                l_max,
+                                                                p_cp,
+                                                                p_rc,
+                                                                p_l,
+                                                                nl_max,
+                                                                r,
+                                                                capital_l,
+                                                            },
+                                                            repeat_times,
+                                                        };
+
+                                                        if mpi.is_root {
                                                             eprintln!(
                                                                 "{}",
                                                                 serde_json::to_string_pretty(
-                                                                    &result
+                                                                    &bench_config
                                                                 )
                                                                 .unwrap()
                                                             );
-
-                                                            run_results.push(result);
                                                         }
-                                                        if found_optimal_tour {
-                                                            break;
-                                                        }
-                                                        ant_cycle.reset_all_state(init_g);
-                                                    }
 
-                                                    let bench_duration = bench_start.elapsed();
+                                                        for run_number in 0..repeat_times {
+                                                            // for run_number in 0.. {
+                                                            let run_start = Instant::now();
 
-                                                    // Output results.
-                                                    if mpi.is_root {
-                                                        let results = BenchmarkResults {
-                                                            bench_config,
-                                                            benchmark_start_time_millis:
-                                                                bench_start_absolute
-                                                                    .duration_since(UNIX_EPOCH)
+                                                            // todo!("Benchmark logic goes here");
+                                                            let found_optimal_tour = qcabc
+                                                                .iterate_until_optimal(
+                                                                    max_iterations,
+                                                                );
+                                                            // Needed returns: found_optimal, shortest_found (per getter), iteration_reached (galima paimti per getter)
+                                                            if mpi.is_root {
+                                                                let run_duration =
+                                                                    run_start.elapsed();
+                                                                let result = RunResult {
+                                                                    run_number,
+                                                                    found_optimal_tour,
+                                                                    shortest_found_tour: qcabc
+                                                                        .best_tour()
+                                                                        .length(),
+                                                                    iteration_reached: qcabc
+                                                                        .iteration(),
+                                                                    duration_millis: run_duration
+                                                                        .as_millis(),
+                                                                };
+
+                                                                // Dump partial results in case the benchmark is killed before completing all the runs.
+                                                                eprintln!(
+                                                                    "{}",
+                                                                    serde_json::to_string_pretty(
+                                                                        &result
+                                                                    )
                                                                     .unwrap()
-                                                                    .as_millis(),
-                                                            benchmark_duration_millis:
-                                                                bench_duration.as_millis(),
-                                                            run_results,
-                                                        };
-                                                        let json =
-                                                            serde_json::to_string_pretty(&results)
+                                                                );
+
+                                                                run_results.push(result);
+                                                            }
+                                                            if found_optimal_tour {
+                                                                break;
+                                                            }
+                                                        }
+
+                                                        let bench_duration = bench_start.elapsed();
+
+                                                        // Output results.
+                                                        if mpi.is_root {
+                                                            let results = BenchmarkResults {
+                                                                bench_config,
+                                                                benchmark_start_time_millis:
+                                                                    bench_start_absolute
+                                                                        .duration_since(UNIX_EPOCH)
+                                                                        .unwrap()
+                                                                        .as_millis(),
+                                                                benchmark_duration_millis:
+                                                                    bench_duration.as_millis(),
+                                                                run_results,
+                                                            };
+                                                            let json =
+                                                                serde_json::to_string_pretty(
+                                                                    &results,
+                                                                )
                                                                 .unwrap();
-                                                        // This is the actual meaningful output, so dump it to stdout
-                                                        // instead of stderr (allows to easily redirect it to file).
-                                                        println!("{json}");
-                                                        let mut file = open_output_file(
-                                                            &save_file_path,
-                                                            duplicate_handling,
-                                                        );
-                                                        eprintln!(
+                                                            // This is the actual meaningful output, so dump it to stdout
+                                                            // instead of stderr (allows to easily redirect it to file).
+                                                            println!("{json}");
+                                                            let mut file = open_output_file(
+                                                                &save_file_path,
+                                                                duplicate_handling,
+                                                            );
+                                                            eprintln!(
                                                             "Saving results to '{save_file_path}'"
                                                         );
-                                                        file.write_all(json.as_bytes());
+                                                            file.write_all(json.as_bytes());
+                                                        }
                                                     }
                                                 }
                                             }
