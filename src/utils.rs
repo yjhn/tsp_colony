@@ -52,7 +52,7 @@ pub fn all_cities_fill(buf: &mut Vec<CityIndex>, count: u16) {
 /// Generates random seed and broadcasts it for every process.
 pub fn initialize_random_seed(
     root_process: Process<SystemCommunicator>,
-    rank: i32,
+    rank: usize,
     is_root: bool,
 ) -> u64 {
     // Broadcast global random seed.
@@ -64,9 +64,9 @@ pub fn initialize_random_seed(
 pub struct Mpi<'a> {
     pub universe: Universe,
     pub world: SystemCommunicator,
-    pub world_size: i32,
+    pub world_size: usize,
     pub root_process: Process<'a, SystemCommunicator>,
-    pub rank: i32,
+    pub rank: usize,
     pub is_root: bool,
 }
 

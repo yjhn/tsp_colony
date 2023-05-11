@@ -1,4 +1,4 @@
-//! Combinatorial artificial bee colony.
+//! Quick combinatorial artificial bee colony (qCABC).
 
 use std::ops::{Deref, DerefMut};
 
@@ -90,13 +90,7 @@ impl Deref for TourExt {
     }
 }
 
-// impl DerefMut for TourExt {
-//     fn deref_mut(&mut self) -> &mut Self::Target {
-//         &mut self.tour
-//     }
-// }
-
-pub struct CombArtBeeColony<'a, R: Rng> {
+pub struct QuickCombArtBeeColony<'a, R: Rng> {
     colony_size: usize,
     iteration: u32, // max iterations will be specified on method evolve_until_optimal
     tours: Vec<TourExt>,
@@ -117,7 +111,7 @@ pub struct CombArtBeeColony<'a, R: Rng> {
     mpi: &'a Mpi<'a>,
 }
 
-impl<'a, R: Rng> CombArtBeeColony<'a, R> {
+impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
     pub fn new(
         tsp_problem: &'a TspProblem,
         colony_size: usize,
@@ -188,11 +182,9 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
         let mut tour_distances = SquareMatrix::new(self.tours.len(), 0);
         let distrib01 = distributions::Uniform::new(0.0, 1.0).unwrap();
 
-        let world_size = self.mpi.world_size as usize;
+        let world_size = self.mpi.world_size;
         // We will never exchange with ourselves.
-        let other_cpus: Vec<usize> = (0..world_size)
-            .filter(|&e| e != self.mpi.rank as usize)
-            .collect();
+        let other_cpus: Vec<usize> = (0..world_size).filter(|&e| e != self.mpi.rank).collect();
         // Buffer for CPUs' best tours.
         // Tour::APPENDED_HACK_ELEMENTS extra spaces at the end are for tour length.
         let mut cpus_best_tours_buf =
@@ -392,10 +384,7 @@ impl<'a, R: Rng> CombArtBeeColony<'a, R> {
     fn cvg_avg(&self, cpus_best_tours_buf: &[CityIndex]) -> Float {
         let chunk_size = self.number_of_cities() + Tour::APPENDED_HACK_ELEMENTS;
         debug_assert_eq!(cpus_best_tours_buf.len() % chunk_size, 0);
-        debug_assert_eq!(
-            cpus_best_tours_buf.len() / chunk_size,
-            self.mpi.world_size as usize
-        );
+        debug_assert_eq!(cpus_best_tours_buf.len() / chunk_size, self.mpi.world_size);
 
         let cvg_sum: Float = cpus_best_tours_buf
             .chunks_exact(chunk_size)

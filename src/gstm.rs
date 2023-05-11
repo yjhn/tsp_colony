@@ -5,11 +5,11 @@
 use rand::{distributions::Uniform, prelude::Distribution, seq::SliceRandom, Rng};
 
 use crate::{
-    cabc::NeighbourMatrix,
     config::{DistanceT, Float, MainRng},
     distance_matrix::DistanceMatrix,
     index::{CityIndex, TourIndex},
     matrix::Matrix,
+    qcabc::NeighbourMatrix,
     tour::{Tour, TourFunctions},
 };
 

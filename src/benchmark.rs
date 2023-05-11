@@ -45,7 +45,7 @@ struct ShortProblemDesc<'a> {
 
 #[derive(Serialize)]
 struct BenchmarkConfig<'a, T: Serialize> {
-    process_count: i32,
+    process_count: usize,
     problem: ShortProblemDesc<'a>,
     algorithm: &'static str,
     algorithm_constants: T,

@@ -44,9 +44,9 @@ fn main() {
     let mpi = Mpi {
         universe,
         world,
-        world_size,
+        world_size: world_size as usize,
         root_process,
-        rank,
+        rank: rank as usize,
         is_root: rank == MPI_ROOT_RANK,
     };
     let args = if mpi.is_root {

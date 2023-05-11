@@ -149,11 +149,9 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         let mut found_optimal = false;
         let mut delta_tau_matrix = SquareMatrix::new(num_cities, 0.0);
 
-        let world_size = self.mpi.world_size as usize;
+        let world_size = self.mpi.world_size;
         // We will never exchange with ourselves.
-        let other_cpus: Vec<usize> = (0..world_size)
-            .filter(|&e| e != self.mpi.rank as usize)
-            .collect();
+        let other_cpus: Vec<usize> = (0..world_size).filter(|&e| e != self.mpi.rank).collect();
         // Buffer for CPUs' best tours.
         // Tour::APPENDED_HACK_ELEMENTS extra spaces at the end are for tour length.
         let mut cpus_best_tours_buf =
@@ -217,7 +215,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 self.update_pheromones_from_partner(
                     &best_partner_tour[..num_cities],
                     fitness[exchange_partner],
-                    fitness[self.mpi.rank as usize],
+                    fitness[self.mpi.rank],
                     best_partner_tour.get_hack_tour_length(),
                     &mut delta_tau_matrix,
                     min_delta_tau,
@@ -432,7 +430,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
     }
 
     fn calculate_neighbour_values(&self, proc_distances: &mut SquareMatrix<u16>) -> Vec<Float> {
-        let world_size = self.mpi.world_size as usize;
+        let world_size = self.mpi.world_size;
         let mut neighbour_values = Vec::with_capacity(world_size);
         for y in 0..world_size {
             let mut row = proc_distances.row_mut(y);
@@ -454,11 +452,10 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         neighbour_values: &[Float],
         other_cpus: &[usize],
     ) -> usize {
-        let rank = self.mpi.rank as usize;
         let mut denominator = 0.0;
-        let self_neighbour = neighbour_values[rank];
+        let self_neighbour = neighbour_values[self.mpi.rank];
         for i in 0..neighbour_values.len() {
-            if i == rank {
+            if i == self.mpi.rank {
                 continue;
             }
             denominator += Float::abs(self_neighbour - neighbour_values[i]) * fitness[i];
@@ -530,10 +527,9 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
     fn cvg_avg(&self, cpus_best_tours_buf: &[CityIndex]) -> Float {
         let chunk_size = self.number_of_cities() + Tour::APPENDED_HACK_ELEMENTS;
         debug_assert_eq!(cpus_best_tours_buf.len() % chunk_size, 0);
-        debug_assert_eq!(
-            cpus_best_tours_buf.len() / chunk_size,
-            self.mpi.world_size as usize
-        );
+        debug_assert_eq!(cpus_best_tours_buf.len() / chunk_size, {
+            self.mpi.world_size
+        });
 
         let cvg_sum: Float = cpus_best_tours_buf
             .chunks_exact(chunk_size)
