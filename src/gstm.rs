@@ -18,15 +18,25 @@ use crate::{
 pub fn generate_neighbour<R: Rng>(
     t_i: &Tour,
     t_k: &Tour,
-    rng: &mut R,
     p_rc: Float,
     p_cp: Float,
     p_l: Float,
+    min_subtour_cities: usize,
+    max_subtour_cities: usize,
     neighbourhood_lists: &NeighbourMatrix,
     distances: &DistanceMatrix,
+    cities_distrib: Uniform<u16>,
+    rng: &mut R,
 ) -> Tour {
     // t_star_i is the open tour segment.
-    let (before_t_star_i, after_t_star_i) = select_subtour(t_i, t_k, rng);
+    let (before_t_star_i, after_t_star_i) = select_subtour(
+        t_i,
+        t_k,
+        min_subtour_cities,
+        max_subtour_cities,
+        cities_distrib,
+        rng,
+    );
 
     let r1 = t_i.next_city(before_t_star_i);
     let r2 = t_i.previous_city(after_t_star_i);
@@ -98,30 +108,40 @@ fn choose_non_preceding<R: Rng>(
 fn select_subtour<R: Rng>(
     t_i: &[CityIndex],
     t_k: &[CityIndex],
+    min_subtour_cities: usize,
+    max_subtour_cities: usize,
+    cities_distrib: Uniform<u16>,
     rng: &mut R,
 ) -> (TourIndex, TourIndex) {
-    // Randomly select a city j.
-    let j = TourIndex::random(rng, t_i.number_of_cities());
-    let j_k = t_k[j];
-    let j_k_pos_in_t_i = t_i.index_of(j_k);
-    // Randomly select direction value.
-    let fi: bool = rng.gen();
-    // T* is the open tour segment.
-    let (before_t_star_i, after_t_star_i) = if fi {
-        // Forward direction.
-        let after_j_k = t_k.next_city(j);
-        let after_j_k_pos_in_t_i = t_i.index_of(after_j_k);
-        // let t_hash_i = t_i.subtour(j_k_pos_in_t_i, after_j_k_pos_in_t_i);
-        (j_k_pos_in_t_i, after_j_k_pos_in_t_i)
-    } else {
-        // Backward direction.
-        let before_j_k = t_k.previous_city(j);
-        let before_j_k_pos_in_t_i = t_i.index_of(before_j_k);
-        // Cities in t_i between before_j_k_pos_in_t_i and before_j_k form an unclosed
-        // subtour T^#_i
-        // let t_hash_i = t_i.subtour(before_j_k_pos_in_t_i, j_k_pos_in_t_i);
-        (before_j_k_pos_in_t_i, j_k_pos_in_t_i)
-    };
+    loop {
+        // Randomly select a city j.
+        let j = TourIndex::random(cities_distrib, rng);
+        let j_k = t_k[j];
+        let j_k_pos_in_t_i = t_i.index_of(j_k);
+        // Randomly select direction value.
+        let fi: bool = rng.gen();
+        // T* is the open tour segment.
+        let (before_t_star_i, after_t_star_i) = if fi {
+            // Forward direction.
+            let after_j_k = t_k.next_city(j);
+            let after_j_k_pos_in_t_i = t_i.index_of(after_j_k);
+            // let t_hash_i = t_i.subtour(j_k_pos_in_t_i, after_j_k_pos_in_t_i);
+            (j_k_pos_in_t_i, after_j_k_pos_in_t_i)
+        } else {
+            // Backward direction.
+            let before_j_k = t_k.previous_city(j);
+            let before_j_k_pos_in_t_i = t_i.index_of(before_j_k);
+            // Cities in t_i between before_j_k_pos_in_t_i and before_j_k form an unclosed
+            // subtour T^#_i
+            // let t_hash_i = t_i.subtour(before_j_k_pos_in_t_i, j_k_pos_in_t_i);
+            (before_j_k_pos_in_t_i, j_k_pos_in_t_i)
+        };
 
-    (before_t_star_i, after_t_star_i)
+        // Number of cities in segment must be between `min_subtour_cities` and `max_subtour_cities`.
+        debug_assert!(t_i.segment_len(before_t_star_i, after_t_star_i) >= 2);
+        let segment_len = t_i.segment_len(before_t_star_i, after_t_star_i) - 2;
+        if (min_subtour_cities..=max_subtour_cities).contains(&segment_len) {
+            return (before_t_star_i, after_t_star_i);
+        }
+    }
 }

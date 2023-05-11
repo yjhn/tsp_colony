@@ -1,5 +1,7 @@
 use mpi::traits::Equivalence;
 use rand::Rng;
+use rand_distr::Distribution;
+use rand_distr::Uniform;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::ops::Sub;
@@ -60,8 +62,8 @@ impl TourIndex {
         Self(idx)
     }
 
-    pub fn random<R: Rng>(rng: &mut R, number_of_cities: usize) -> Self {
-        Self::new(rng.gen_range(0..number_of_cities))
+    pub fn random<R: Rng>(cities_distrib: Uniform<u16>, rng: &mut R) -> Self {
+        Self::new(usize::from(cities_distrib.sample(rng)))
     }
 
     pub fn wrapping_inc(self, max: usize) -> Self {
