@@ -21,8 +21,8 @@ use std::process;
 
 use crate::{
     arguments::{Args, PopulationSizes},
-    benchmark::benchmark_ant_cycle,
-    config::paco,
+    benchmark::{benchmark_ant_cycle, benchmark_qcabc},
+    config::{paco, qcabc as abc},
     utils::Mpi,
 };
 use clap::Parser;
@@ -67,7 +67,7 @@ fn main() {
 
     let capital_q_muls = args
         .capital_q_muls
-        .unwrap_or_else(|| vec![config::paco::CAPITAL_Q_MULTIPLIER]);
+        .unwrap_or_else(|| vec![paco::CAPITAL_Q_MULTIPLIER]);
     let init_intensities = args
         .init_intensities
         .unwrap_or_else(|| vec![paco::INITIAL_TRAIL_INTENSITY]);
@@ -76,6 +76,14 @@ fn main() {
         .unwrap_or_else(|| vec![config::LOWERCASE_Q]);
     let init_gs = args.init_gs.unwrap_or_else(|| vec![config::INIT_G]);
     let ks = args.ks.unwrap_or_else(|| vec![config::K]);
+    let p_rcs = args.p_rcs.unwrap_or_else(|| vec![abc::P_RC]);
+    let p_cps = args.p_cps.unwrap_or_else(|| vec![abc::P_CP]);
+    let p_ls = args.p_ls.unwrap_or_else(|| vec![abc::P_L]);
+    let l_mins = args.l_mins.unwrap_or_else(|| vec![abc::L_MIN]);
+    let l_max_muls = args.l_max_muls.unwrap_or_else(|| vec![abc::L_MAX_MUL]);
+    let nl_maxs = args.nl_maxs.unwrap_or_else(|| vec![abc::NL_MAX]);
+    let rs = args.rs.unwrap_or_else(|| vec![abc::R]);
+    let capital_ls = args.capital_ls.unwrap_or_else(|| abc::CAPITAL_LS.to_vec());
 
     let population_sizes = if let Some(popsizes) = args.population_sizes {
         PopulationSizes::Custom(popsizes)
@@ -83,21 +91,43 @@ fn main() {
         PopulationSizes::SameAsCityCount
     };
 
-    benchmark_ant_cycle::<_, config::MainRng>(
-        &args.files,
-        args.bench_repeat_times,
-        population_sizes,
-        args.max_iterations,
-        args.dup,
-        &args.bench_results_dir,
-        &alphas,
-        &betas,
-        &capital_q_muls,
-        &ros,
-        &lowercase_qs,
-        &init_gs,
-        &ks,
-        &init_intensities,
-        &mpi,
-    );
+    match args.algo {
+        arguments::Algorithm::Paco => benchmark_ant_cycle::<_, config::MainRng>(
+            &args.files,
+            args.bench_repeat_times,
+            population_sizes,
+            args.max_iterations.unwrap_or(paco::MAX_ITERATIONS),
+            args.dup,
+            &args.bench_results_dir,
+            &alphas,
+            &betas,
+            &capital_q_muls,
+            &ros,
+            &lowercase_qs,
+            &init_gs,
+            &ks,
+            &init_intensities,
+            &mpi,
+        ),
+        arguments::Algorithm::Qcabc => benchmark_qcabc::<_, config::MainRng>(
+            &args.files,
+            &args.bench_results_dir,
+            args.dup,
+            args.bench_repeat_times,
+            args.max_iterations.unwrap_or(abc::MAX_ITERATIONS),
+            population_sizes,
+            &nl_maxs,
+            &p_cps,
+            &p_rcs,
+            &p_ls,
+            &l_mins,
+            &l_max_muls,
+            &capital_ls,
+            &rs,
+            &lowercase_qs,
+            &init_gs,
+            &ks,
+            &mpi,
+        ),
+    }
 }

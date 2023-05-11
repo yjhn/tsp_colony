@@ -46,7 +46,7 @@ pub const LOWERCASE_Q: usize = 3;
 
 pub const INIT_G: u32 = 1;
 
-pub const K: u32 = 16;
+pub const K: Float = 16.0;
 // Benchmark repeat times.
 pub const REPEAT_TIMES: u32 = 50;
 // Benchmark results directory.

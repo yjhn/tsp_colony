@@ -76,7 +76,7 @@ pub fn benchmark_ant_cycle<PD, R>(
     ros: &[Float],
     lowercase_qs: &[usize],
     init_gs: &[u32],
-    ks: &[u32],
+    ks: &[Float],
     init_intensities: &[Float],
     mpi: &Mpi,
 ) where
@@ -132,7 +132,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                                         ant_cycle.set_g(init_g);
 
                                         for &k in ks {
-                                            ant_cycle.set_k(k);
+                                            ant_cycle.set_k(k as u32);
 
                                             // Figure out where to save the results.
                                             let mut skip = [false];
@@ -182,7 +182,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                                                     init_intensity: intense,
                                                     lowercase_q,
                                                     init_g,
-                                                    k,
+                                                    k: k as u32,
                                                 },
                                                 repeat_times,
                                             };

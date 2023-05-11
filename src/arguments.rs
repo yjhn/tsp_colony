@@ -44,11 +44,11 @@ pub struct Args {
     pub init_gs: Option<Vec<u32>>,
 
     #[arg(long, num_args(1..))]
-    pub ks: Option<Vec<u32>>,
+    pub ks: Option<Vec<Float>>,
 
-    #[arg(short, long, default_value_t = paco::MAX_ITERATIONS)]
+    #[arg(short, long)]
     /// Maximum number of generations for obtaining the optimal solution.
-    pub max_iterations: u32,
+    pub max_iterations: Option<u32>,
 
     #[arg(short, long, num_args(1..))]
     /// Ant population sizes. If not specified, defaults to city count.
