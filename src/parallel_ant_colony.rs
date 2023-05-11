@@ -527,9 +527,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
     fn cvg_avg(&self, cpus_best_tours_buf: &[CityIndex]) -> Float {
         let chunk_size = self.number_of_cities() + Tour::APPENDED_HACK_ELEMENTS;
         debug_assert_eq!(cpus_best_tours_buf.len() % chunk_size, 0);
-        debug_assert_eq!(cpus_best_tours_buf.len() / chunk_size, {
-            self.mpi.world_size
-        });
+        debug_assert_eq!(cpus_best_tours_buf.len() / chunk_size, self.mpi.world_size);
 
         let cvg_sum: Float = cpus_best_tours_buf
             .chunks_exact(chunk_size)
@@ -562,8 +560,8 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
     fn set_exchange_interval(&mut self, cvg_avg: Float) {
         if cvg_avg >= 0.8 || cvg_avg <= 0.2 {
             let new_g = self.g as Float + ((0.5 - cvg_avg) * self.k as Float);
-            debug_assert!(new_g >= 0.0);
-            self.g = max(new_g as u32, 1);
+            // let new_g = self.g as Float + ((cvg_avg - 0.5) * self.k as Float);
+            self.g = maxf(new_g, 1.0) as u32;
         }
     }
 }

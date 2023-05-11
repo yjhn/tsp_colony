@@ -119,7 +119,7 @@ impl Ant {
             // let numerator = matrix.pheromone((ord.1, ord.0)).powf(alpha) * matrix.visibility(ord);
             let numerator = matrix.pheromone((ord.1, ord.0)) * matrix.visibility(ord);
             let p = numerator / denominator;
-            debug_assert!((0.0..=1.0).contains(&p), "p: {}", p);
+            debug_assert!((0.0..=1.0).contains(&p), "p: {p}");
             if p > distrib.sample(rng) {
                 // This city is the chosen one.
                 self.visit_city(city, idx);
