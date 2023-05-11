@@ -25,9 +25,6 @@ use crate::{
 /// "A parallel ant colony algorithm on massively parallel processors and
 /// its convergence analysis for the travelling salesman problem"
 pub struct PacoRunner<'a, R: Rng + SeedableRng> {
-    /// Current time. Increases by number of cities in each iteration.
-    // TODO: maybe this is not needed?
-    time: usize,
     iteration: u32,
     ant_count: usize,
     ants: Vec<Ant>,
@@ -81,7 +78,6 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         }
 
         PacoRunner {
-            time: 0,
             iteration: 0,
             ant_count,
             ants,
@@ -134,7 +130,6 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 CityIndex::new(self.cities_distrib.sample(&mut self.rng)),
             );
         }
-        self.time = 0;
         self.iteration = 0;
         self.best_tour = Tour::PLACEHOLDER;
         self.pheromone_matrix
@@ -174,7 +169,6 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
             }
 
             self.iteration += 1;
-            self.time += num_cities;
 
             let capital_q = iteration_tours.long_tour_length as Float * self.capital_q_mul;
             let min_delta_tau = capital_q / iteration_tours.short_tour_length as Float;
