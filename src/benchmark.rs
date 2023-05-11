@@ -333,7 +333,7 @@ struct QcabcConstants {
     p_rc: Float,
     p_l: Float,
     l_min: usize,
-    l_max: usize,
+    l_max_mul: Float,
     r: Float,
     capital_l: Float,
     lowercase_q: usize,
@@ -353,7 +353,7 @@ pub fn benchmark_qcabc<PD, R>(
     p_rcs: &[Float],
     p_ls: &[Float],
     l_mins: &[usize],
-    l_maxs: &[usize],
+    l_max_muls: &[Float],
     capital_ls: &[Float],
     rs: &[Float],
     lowercase_qs: &[usize],
@@ -392,7 +392,7 @@ pub fn benchmark_qcabc<PD, R>(
                     for p_rc in p_rcs.iter().copied() {
                         for p_l in p_ls.iter().copied() {
                             for l_min in l_mins.iter().copied() {
-                                for l_max in l_maxs.iter().copied() {
+                                for l_max_mul in l_max_muls.iter().copied() {
                                     for r in rs.iter().copied() {
                                         for lowercase_q in lowercase_qs.iter().copied() {
                                             for initial_g in initial_gs.iter().copied() {
@@ -400,14 +400,14 @@ pub fn benchmark_qcabc<PD, R>(
                                                     for capital_l in capital_ls.iter().copied() {
                                                         let mut qcabc = QuickCombArtBeeColony::new(
                                                             &problem,
-                                                            colony_size as usize,
+                                                            colony_size,
                                                             nl_max,
                                                             capital_l,
                                                             p_cp,
                                                             p_rc,
                                                             p_l,
                                                             l_min,
-                                                            l_max,
+                                                            l_max_mul,
                                                             r,
                                                             lowercase_q,
                                                             initial_g,
@@ -419,8 +419,8 @@ pub fn benchmark_qcabc<PD, R>(
                                                         let mut skip = [false];
                                                         let save_file_path = if mpi.is_root {
                                                             let mut save_file_path = format!(
-                                        "{dir}/bm_qcabc_{name}_{cpus}cpus_cs{cs}_nlmax{nlmax}_pcp{pcp}_prc{prc}_pl{pl}_lmin{lmin}_lmax{lmax}_r{r}_q{q}_g{g}_k{k}.json",
-                                        dir=results_dir, name=problem.name(), cpus=process_count,cs=colony_size, nlmax=nl_max, pcp=p_cp, prc=p_rc, pl=p_l, lmin=l_min, lmax=l_max, r=r, q=lowercase_q, g=initial_g, k=k                                     );
+                                        "{dir}/bm_qcabc_{name}_{cpus}cpus_cs{cs}_nlmax{nlmax}_pcp{pcp}_prc{prc}_pl{pl}_lmin{lmin}_lmaxm{lmax}_r{r}_q{q}_g{g}_k{k}.json",
+                                        dir=results_dir, name=problem.name(), cpus=process_count,cs=colony_size, nlmax=nl_max, pcp=p_cp, prc=p_rc, pl=p_l, lmin=l_min, lmax=l_max_mul, r=r, q=lowercase_q, g=initial_g, k=k                                     );
                                                             match get_output_file_path(
                                                                 &mut save_file_path,
                                                                 results_dir,
@@ -464,7 +464,7 @@ pub fn benchmark_qcabc<PD, R>(
                                                                 initial_g,
                                                                 k,
                                                                 l_min,
-                                                                l_max,
+                                                                l_max_mul,
                                                                 p_cp,
                                                                 p_rc,
                                                                 p_l,

@@ -1,6 +1,6 @@
 use clap::{Parser, ValueEnum};
 
-use crate::config::{self, Float};
+use crate::config::{self, paco, qcabc, Float};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum DuplicateHandling {
@@ -22,6 +22,64 @@ pub struct Args {
     /// TSP problem definition files.
     pub files: Vec<String>,
 
+    #[arg(long, required = false, default_value_t = config::RESULTS_DIR.to_owned())]
+    pub bench_results_dir: String,
+
+    #[arg(value_enum, long, required = false, default_value_t = DuplicateHandling::Panic)]
+    /// What to do if existing benchmark results files are found.
+    pub dup: DuplicateHandling,
+
+    #[arg(value_enum, long, required = true)]
+    pub algo: Algorithm,
+
+    // Options applicable to both qCABC and PACO.
+    #[arg(short, long, default_value_t = config::REPEAT_TIMES)]
+    /// Number of times to repeat the benchmark.
+    pub bench_repeat_times: u32,
+
+    #[arg(long, num_args(1..))]
+    pub lowercase_qs: Option<Vec<usize>>,
+
+    #[arg(long, num_args(1..))]
+    pub init_gs: Option<Vec<u32>>,
+
+    #[arg(long, num_args(1..))]
+    pub ks: Option<Vec<u32>>,
+
+    #[arg(short, long, default_value_t = paco::MAX_ITERATIONS)]
+    /// Maximum number of generations for obtaining the optimal solution.
+    pub max_iterations: u32,
+
+    #[arg(short, long, num_args(1..))]
+    /// Ant population sizes. If not specified, defaults to city count.
+    pub population_sizes: Option<Vec<u32>>,
+
+    // qCABC-specific options.
+    #[arg(long, num_args(1..))]
+    pub p_rcs: Option<Vec<Float>>,
+
+    #[arg(long, num_args(1..))]
+    pub p_cps: Option<Vec<Float>>,
+
+    #[arg(long, num_args(1..))]
+    pub p_ls: Option<Vec<Float>>,
+
+    #[arg(long, num_args(1..))]
+    pub l_mins: Option<Vec<usize>>,
+
+    #[arg(long, num_args(1..))]
+    pub l_max_muls: Option<Vec<Float>>,
+
+    #[arg(long, num_args(1..))]
+    pub nl_maxs: Option<Vec<u16>>,
+
+    #[arg(long, num_args(1..))]
+    pub rs: Option<Vec<Float>>,
+
+    #[arg(long, num_args(1..))]
+    pub capital_ls: Option<Vec<Float>>,
+
+    // PACO-specific options.
     #[arg(long, num_args(1..))]
     pub alphas: Option<Vec<Float>>,
 
@@ -38,38 +96,16 @@ pub struct Args {
 
     #[arg(long, num_args(1..))]
     pub init_intensities: Option<Vec<Float>>,
-
-    #[arg(long, num_args(1..))]
-    pub lowercase_qs: Option<Vec<usize>>,
-
-    #[arg(long, num_args(1..))]
-    pub init_gs: Option<Vec<u32>>,
-
-    #[arg(long, num_args(1..))]
-    pub ks: Option<Vec<u32>>,
-
-    #[arg(short, long, default_value_t = config::MAX_ITERATIONS)]
-    /// Maximum number of generations for obtaining the optimal solution.
-    pub max_iterations: u32,
-
-    #[arg(short, long, default_value_t = config::REPEAT_TIMES)]
-    /// Number of times to repeat the benchmark.
-    pub bench_repeat_times: u32,
-
-    #[arg(long, required = false, default_value_t = config::RESULTS_DIR.to_owned())]
-    pub bench_results_dir: String,
-
-    #[arg(short, long, num_args(1..))]
-    /// Ant population sizes. If not specified, defaults to city count.
-    pub population_sizes: Option<Vec<u32>>,
-
-    #[arg(value_enum, long, required = false, default_value_t = DuplicateHandling::Panic)]
-    /// What to do if existing benchmark results files are found.
-    pub dup: DuplicateHandling,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum PopulationSizes {
     SameAsCityCount,
     Custom(Vec<u32>),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, ValueEnum)]
+pub enum Algorithm {
+    Paco,
+    Qcabc,
 }

@@ -95,7 +95,7 @@ impl Deref for TourExt {
 }
 
 pub struct QuickCombArtBeeColony<'a, R: Rng> {
-    colony_size: usize,
+    colony_size: u32,
     iteration: u32, // max iterations will be specified on method evolve_until_optimal
     tours: Vec<TourExt>,
     best_tour: Tour,
@@ -124,14 +124,14 @@ pub struct QuickCombArtBeeColony<'a, R: Rng> {
 impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
     pub fn new(
         tsp_problem: &'a TspProblem,
-        colony_size: usize,
-        nl_max: u16,
+        colony_size: u32,
+        nl_max: u16, // neighbours in neighbour list
         capital_l: Float,
         p_cp: Float,
         p_rc: Float,
         p_l: Float,
         l_min: usize,
-        l_max: usize,
+        l_max_mul: Float,
         r: Float,
         lowercase_q: usize,
         initial_g: u32,
@@ -139,7 +139,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         rng: &'a mut R,
         mpi: &'a Mpi<'a>,
     ) -> Self {
-        let mut tours = Vec::with_capacity(colony_size);
+        let mut tours = Vec::with_capacity(colony_size as usize);
         let number_of_cities = tsp_problem.number_of_cities() as u16;
         let mut path_usage_matrix = PathUsageMatrix::new(number_of_cities);
 
@@ -150,10 +150,10 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         for i in 0..colony_size {
             let tour = Tour::random(number_of_cities, tsp_problem.distances(), rng);
             if tour.length() < best_tour_length {
+                best_tour_idx = i as usize;
                 best_tour_length = tour.length();
-                best_tour_idx = i;
             } else if tour.length() > worst_tour_length {
-                worst_tour_idx = i;
+                worst_tour_idx = i as usize;
                 worst_tour_length = tour.length();
             }
             path_usage_matrix.inc_tour_paths(&tour);
@@ -180,7 +180,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
             p_rc,
             p_l,
             l_min,
-            l_max,
+            l_max: (Float::from(number_of_cities) * l_max_mul) as usize,
             r,
             lowercase_q,
             g: initial_g,
@@ -191,7 +191,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         }
     }
 
-    pub fn colony_size(&self) -> usize {
+    pub fn colony_size(&self) -> u32 {
         self.colony_size
     }
 
@@ -200,7 +200,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         // TODO: what is the split between employed bees and foragers (onlookers)?
         // For now we will assume that all bees are both foragers and onlookers.
         let mut found_optimal = false;
-        let distrib_tours = Uniform::new(0, self.colony_size).unwrap();
+        let distrib_tours = Uniform::new(0, self.colony_size as usize).unwrap();
         let mut tour_distances = SquareMatrix::new(self.tours.len(), 0);
         let distrib01 = distributions::Uniform::new(0.0, 1.0).unwrap();
 
@@ -327,8 +327,8 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
     fn employed_bees_phase(&mut self, distrib_tours: Uniform<usize>) {
         for idx in 0..self.colony_size {
             let v_i = gstm::generate_neighbour(
-                &self.tours[idx],
-                &self.tours[choose_except(distrib_tours, idx, self.rng)],
+                &self.tours[idx as usize],
+                &self.tours[choose_except(distrib_tours, idx as usize, self.rng)],
                 self.p_rc,
                 self.p_cp,
                 self.p_l,
@@ -339,8 +339,8 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
                 self.cities_distrib,
                 self.rng,
             );
-            if v_i.is_shorter_than(&self.tours[idx]) {
-                self.tours[idx].set_tour(v_i, &mut self.path_usage_matrix);
+            if v_i.is_shorter_than(&self.tours[idx as usize]) {
+                self.tours[idx as usize].set_tour(v_i, &mut self.path_usage_matrix);
             }
         }
 

@@ -6,6 +6,9 @@ use rand::{
 pub mod paco {
     use super::Float;
 
+    pub const MAX_ITERATIONS: u32 = 4000;
+
+    pub const POPULATION_SIZES: [u32; 4] = [16, 32, 64, 128];
     // α: the relative importance of the trail, α ≥ 0
     // TODO: remove this var as it's always 1, and raising to a power is very expensive.
     pub const ALPHA: Float = 1.0;
@@ -22,8 +25,22 @@ pub mod paco {
     pub const MIN_DELTA_TAU_INIT: f32 = 5.0;
 }
 
-pub const POPULATION_SIZES: [u32; 4] = [16, 32, 64, 128];
-pub const MAX_ITERATIONS: u32 = 5000;
+pub mod qcabc {
+    use super::Float;
+
+    // As defined in PACO paper.
+    pub const COLONY_SIZE: usize = 40;
+    pub const MAX_ITERATIONS: u32 = 800_000;
+    pub const P_RC: Float = 0.5;
+    pub const P_CP: Float = 0.8;
+    pub const P_L: Float = 0.2;
+    pub const L_MIN: usize = 2;
+    pub const L_MAX_MUL: Float = 0.5;
+    pub const NL_MAX: u16 = 5;
+    pub const R: Float = 1.0;
+    pub const CAPITAL_LS: [Float; 4] = [1.0, 2.0, 3.0, 4.0];
+}
+
 // q: how many most similar CPUs to take when calculating neighbour coefficient.
 pub const LOWERCASE_Q: usize = 3;
 
