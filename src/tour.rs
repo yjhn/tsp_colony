@@ -576,7 +576,7 @@ impl TourFunctions for [CityIndex] {
             end - start + 1
         } else {
             // Segment wraps around the end.
-            (self.number_of_cities() - 1 - usize::from(start)) + usize::from(end) + 1
+            (self.number_of_cities() - usize::from(start)) + usize::from(end) + 1
         }
     }
     /// Returns true if `c2` goes right after `c1` in the tour.
