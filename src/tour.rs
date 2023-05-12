@@ -121,7 +121,12 @@ impl Tour {
         length: DistanceT,
         distances: &DistanceMatrix,
     ) -> Tour {
-        debug_assert_eq!(length, tour.calculate_tour_length(distances));
+        debug_assert_eq!(
+            length,
+            tour.calculate_tour_length(distances),
+            "last to first: {}",
+            distances[tour.last_to_first_path()]
+        );
 
         Tour {
             cities: tour.to_owned(),
@@ -151,9 +156,8 @@ impl Tour {
 
     // pub fn remove_hack_length_and_mpi_rank(&mut self) {
     pub fn remove_hack_length_cvg(&mut self) {
-        for _ in 0..Self::APPENDED_HACK_ELEMENTS {
-            self.cities.pop();
-        }
+        self.cities
+            .truncate(self.cities.len() - Self::APPENDED_HACK_ELEMENTS);
     }
 
     // More is better.
@@ -173,27 +177,38 @@ impl Tour {
     }
 
     fn update_shortest(
+        self: &Self,
         current_shortest_before: &mut usize,
         current_shortest_reversed: &mut bool,
-        current_shortest_added_paths_len: &mut DistanceT,
+        current_shortest_added_paths_len: &mut i32,
         (segment_start, segment_end): (CityIndex, CityIndex),
-        idx: usize,
+        c1_idx: usize,
         (c1, c2): (CityIndex, CityIndex),
         distances: &DistanceMatrix,
     ) {
-        let regular_extension = distances[(c1, segment_start)] + distances[(segment_end, c2)];
-        let reversed_extension = distances[(c2, segment_start)] + distances[(segment_end, c1)];
+        debug_assert_eq!(self.cities[c1_idx], c1);
+
+        let regular_extension =
+            (distances[(c1, segment_start)] + distances[(segment_end, c2)]) as i32;
+        let reversed_extension =
+            (distances[(c2, segment_start)] + distances[(segment_end, c1)]) as i32;
+        let removed_path_where_segment_will_be_inserted = distances[(c1, c2)] as i32;
 
         if regular_extension < reversed_extension {
+            let regular_extension = regular_extension - removed_path_where_segment_will_be_inserted;
             if regular_extension < *current_shortest_added_paths_len {
-                *current_shortest_before = idx;
+                *current_shortest_before = c1_idx;
                 *current_shortest_reversed = false;
                 *current_shortest_added_paths_len = regular_extension;
             }
-        } else if reversed_extension < *current_shortest_added_paths_len {
-            *current_shortest_before = idx;
-            *current_shortest_reversed = true;
-            *current_shortest_added_paths_len = reversed_extension;
+        } else {
+            let reversed_extension =
+                reversed_extension - removed_path_where_segment_will_be_inserted;
+            if reversed_extension < *current_shortest_added_paths_len {
+                *current_shortest_before = c1_idx;
+                *current_shortest_reversed = true;
+                *current_shortest_added_paths_len = reversed_extension;
+            }
         }
     }
 
@@ -209,7 +224,7 @@ impl Tour {
         //     dbg!();
         // }
 
-        for _ in 1..=inversion_size {
+        for _ in 0..inversion_size {
             self.swap(TourIndex::new(left), TourIndex::new(right));
             left = (left + 1) % len;
             right = (len + right - 1) % len;
@@ -220,7 +235,7 @@ impl Tour {
 
     // TODO: galima paminėti, kad čia visai panašu į 3-opt subset, kai jau pasirinkom
     // iškerpamą segmentą.
-    /// Returns a new tour with segment beween (not including) `before_segment_start`
+    /// Returns a new tour with segment between (not including) `before_segment_start`
     /// and `after_segment_end` inserted into the location that minimizes the length.
     pub fn reinsert_segment_for_maximum_gain(
         &self,
@@ -228,8 +243,8 @@ impl Tour {
         after_segment_end: TourIndex,
         distances: &DistanceMatrix,
     ) -> Tour {
-        // Resulting tour is identical to the existing one if ase is right after bss (then the
-        // segment is empty) or bss == ase (the segment takes up all but one city).
+        // Resulting tour is identical to the existing one if a_s_e is right after b_s_s (then
+        //  the segment is empty) or b_s_s == a_s_e (the segment takes up all but one city).
         if self.is_next(before_segment_start, after_segment_end)
             || before_segment_start == after_segment_end
         {
@@ -246,27 +261,29 @@ impl Tour {
         let segment_end = self[segment_end_idx];
         let removed_paths_length = distances[(before_segment_start_c, segment_start)]
             + distances[(segment_end, after_segment_end_c)];
-        // City right before the segment insertion location.
+        let added_path_where_segment_was = distances[(before_segment_start_c, after_segment_end_c)];
+        // City right before the segment insertion location (index in self.tour).
         let mut new_segment_before = 0;
         // Whether the segment should be inserted reversed.
         let mut reversed = false;
-        // Length difference to the current tour.
-        let mut added_paths_length = DistanceT::MAX;
+        // (Length added by inserting the segment) - (path where segment is to be inserted).
+        let mut added_paths_length = i32::MAX;
         // Choose where to insert the segment.
         if before_segment_start < after_segment_end {
             // Segment to be reinserted is in the middle.
             // Two parts: |-(first)- bss ----- (segment) ----- ase -(second)-|.
-            for (idx, path) in self.cities[usize::from(after_segment_end)..]
-                .windows(2)
-                .enumerate()
+            for (path, c1_idx) in self.cities[usize::from(after_segment_end)..]
+                .paths()
+                .zip(usize::from(after_segment_end)..)
             {
                 let &[c1, c2] = path else {unreachable!()};
                 Self::update_shortest(
+                    &self,
                     &mut new_segment_before,
                     &mut reversed,
                     &mut added_paths_length,
                     (segment_start, segment_end),
-                    idx + usize::from(after_segment_end),
+                    c1_idx,
                     (c1, c2),
                     distances,
                 );
@@ -274,46 +291,48 @@ impl Tour {
 
             // Last to first city.
             Self::update_shortest(
+                &self,
                 &mut new_segment_before,
                 &mut reversed,
                 &mut added_paths_length,
                 (segment_start, segment_end),
                 self.number_of_cities() - 1,
-                (self.cities[0], *self.cities.last().unwrap()),
+                (*self.cities.last().unwrap(), self.cities[0]),
                 distances,
             );
 
             // First to before_segment_start.
-            for (idx, path) in self.cities[..=usize::from(before_segment_start)]
-                .windows(2)
+            for (c1_idx, path) in self.cities[..=usize::from(before_segment_start)]
+                .paths()
                 .enumerate()
             {
                 let &[c1, c2] = path else {unreachable!()};
                 Self::update_shortest(
+                    &self,
                     &mut new_segment_before,
                     &mut reversed,
                     &mut added_paths_length,
                     (segment_start, segment_end),
-                    idx + usize::from(after_segment_end),
+                    c1_idx,
                     (c1, c2),
                     distances,
                 );
             }
         } else {
             // Segment wraps around the tour end.
-            for (idx, path) in self.cities
+            for (path, c1_idx) in self.cities
                 [usize::from(after_segment_end)..=usize::from(before_segment_start)]
-                .windows(2)
-                .enumerate()
+                .paths()
+                .zip(usize::from(after_segment_end)..)
             {
                 let &[c1,c2] = path else {unreachable!()};
                 Self::update_shortest(
+                    &self,
                     &mut new_segment_before,
                     &mut reversed,
                     &mut added_paths_length,
                     (segment_start, segment_end),
-                    // Enumerate counts items from the beggining of the iterator.
-                    idx + usize::from(before_segment_start),
+                    c1_idx,
                     (c1, c2),
                     distances,
                 );
@@ -323,11 +342,10 @@ impl Tour {
         // Construct a new Tour with the segment inserted into the chosen location.
         let mut cities_new = Vec::with_capacity(self.number_of_cities());
 
-        // New segment will be between new_segment_before and new_segment_after.
+        // New segment will be after new_segment_before.
         // Create the tour using old indices.
         // new_segment_before is always between after_segment_end and before_segment_start
         // (possibly wrapping around end).
-        // let new_segment_after: usize = self.next_idx(TourIndex::new(new_segment_before)).into();
 
         let before_segment_start: usize = before_segment_start.into();
         let after_segment_end: usize = after_segment_end.into();
@@ -359,7 +377,7 @@ impl Tour {
                 // new_segment_before > after_segment_end
                 // Copy 0..=before_segment_start and after_segment_end..=new_segment_before
                 // then insert the segment, then copy new_segment_before+1..
-                cities_new.extend_from_slice(&self.cities[0..before_segment_start]);
+                cities_new.extend_from_slice(&self.cities[0..=before_segment_start]);
                 cities_new.extend_from_slice(&self.cities[after_segment_end..=new_segment_before]);
 
                 // copy segment
@@ -377,7 +395,8 @@ impl Tour {
             // before_segment_start > after_segment_end, non-segment is in one part
             debug_assert!(
                 new_segment_before <= before_segment_start
-                    && new_segment_before >= after_segment_end
+                    && new_segment_before >= after_segment_end,
+                "nsb: {new_segment_before}, bss: {before_segment_start}, ase: {after_segment_end}"
             );
             let segment_slice_p1 = &self.cities[(before_segment_start + 1)..];
             let segment_slice_p2 = &self.cities[..after_segment_end];
@@ -407,9 +426,18 @@ impl Tour {
 
         debug_assert_eq!(self.cities.len(), cities_new.len());
 
+        let new_length = self.tour_length as i32 - removed_paths_length as i32
+            + added_path_where_segment_was as i32
+            + added_paths_length;
+
+        debug_assert_eq!(self.length(), self.calculate_tour_length(distances));
+        debug_assert_eq!(
+            new_length as DistanceT,
+            cities_new.calculate_tour_length(distances)
+        );
         Tour {
             cities: cities_new,
-            tour_length: self.tour_length - removed_paths_length + added_paths_length,
+            tour_length: new_length as DistanceT,
         }
     }
 
@@ -494,6 +522,7 @@ pub trait TourFunctions {
     fn append_reversed_subtour(&self, first: usize, last: usize, buf: &mut Vec<CityIndex>);
     fn subtour(&self, first: TourIndex, last: TourIndex) -> Vec<CityIndex>;
     fn last_to_first_path(&self) -> (CityIndex, CityIndex);
+    fn without_hacks(&self) -> &[CityIndex];
 }
 
 impl TourFunctions for [CityIndex] {
@@ -703,6 +732,10 @@ impl TourFunctions for [CityIndex] {
 
     fn next_city(&self, city: TourIndex) -> CityIndex {
         self[self.next_idx(city)]
+    }
+
+    fn without_hacks(&self) -> &[CityIndex] {
+        &self[0..self.len() - Tour::APPENDED_HACK_ELEMENTS]
     }
 }
 

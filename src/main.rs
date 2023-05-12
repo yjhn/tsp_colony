@@ -17,7 +17,7 @@ mod tsp_problem;
 mod tsplib;
 mod utils;
 
-use std::process;
+use std::{panic, process};
 
 use crate::{
     arguments::{Args, PopulationSizes},
@@ -50,6 +50,17 @@ fn main() {
         rank: rank as usize,
         is_root: rank == MPI_ROOT_RANK,
     };
+    if !is_root {
+        // Silence panic output from non-root processes.
+        panic::set_hook(Box::new(|info| {
+            let location = info.location().unwrap();
+            eprintln!(
+                "Process panicked at {}:{}",
+                location.file(),
+                location.line()
+            );
+        }));
+    }
     let args = if mpi.is_root {
         let args = arguments::Args::try_parse().unwrap_or_else(|e| {
             eprintln!("Error parsing arguments: {}", e);

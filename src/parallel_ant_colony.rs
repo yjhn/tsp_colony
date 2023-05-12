@@ -553,6 +553,8 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
 
     fn set_exchange_interval(&mut self, cvg_avg: Float) {
         if cvg_avg >= 0.8 || cvg_avg <= 0.2 {
+            // The formula gives the opposite result than is written in the article: when
+            // convergence is low (very converged), it increases g.
             let new_g = self.g as Float + ((0.5 - cvg_avg) * self.k as Float);
             // let new_g = self.g as Float + ((cvg_avg - 0.5) * self.k as Float);
             self.g = maxf(new_g, 1.0) as u32;

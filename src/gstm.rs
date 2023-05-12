@@ -13,7 +13,7 @@ use crate::{
     tour::{Tour, TourFunctions},
 };
 
-// Generate neighbours from this tour in place (by mutating the passed-in tour).
+// Generate neighbour from this tour.
 // A new tour V_i is constructed from T_i taking cities from T_k.
 pub fn generate_neighbour<R: Rng>(
     t_i: &Tour,
@@ -26,6 +26,7 @@ pub fn generate_neighbour<R: Rng>(
     neighbourhood_lists: &NeighbourMatrix,
     distances: &DistanceMatrix,
     cities_distrib: Uniform<u16>,
+    distrib01: Uniform<Float>,
     rng: &mut R,
 ) -> Tour {
     // t_star_i is the open tour segment.
@@ -37,14 +38,16 @@ pub fn generate_neighbour<R: Rng>(
         cities_distrib,
         rng,
     );
+    debug_assert_eq!(t_i.length(), t_i.calculate_tour_length(distances));
 
     let r1 = t_i.next_city(before_t_star_i);
     let r2 = t_i.previous_city(after_t_star_i);
-    let distrib01 = Uniform::new(0.0, 1.0).unwrap();
 
     if distrib01.sample(rng) <= p_rc {
         // Add T^*_i to T^#_i so that a minimum extension is generated.
-        t_i.reinsert_segment_for_maximum_gain(before_t_star_i, after_t_star_i, distances)
+        let new = t_i.reinsert_segment_for_maximum_gain(before_t_star_i, after_t_star_i, distances);
+        debug_assert_eq!(new.length(), new.calculate_tour_length(distances));
+        new
     } else {
         let r1_idx = t_i.next_idx(before_t_star_i);
         let r2_idx = t_i.previous_idx(after_t_star_i);
@@ -52,35 +55,40 @@ pub fn generate_neighbour<R: Rng>(
             let t_hash_i = t_i.subtour_inclusive(after_t_star_i, before_t_star_i);
             t_i.distort(t_hash_i, r1_idx, r2_idx, distrib01, rng, p_l, distances)
         } else {
-            let r1 = t_i[r1_idx];
-            let r2 = t_i[r2_idx];
             let r1_neighbourhood_list = neighbourhood_lists.row(usize::from(r1));
             let r2_neighbourhood_list = neighbourhood_lists.row(usize::from(r2));
             // TODO: kaip suprantu, paliekam t_i nepakeistą, tik nl_r1 arba nl_r2 perkeliam kitur?
             let mut new_tour = t_i.clone();
             // Choose random neighbours.
-            let (nl_r1, dist_r1, nl_r1_in_tour) =
-                choose_non_preceding(r1_neighbourhood_list, rng, r1_idx, new_tour.cities());
-            let (nl_r2, dist_r2, nl_r2_in_tour) =
-                choose_non_preceding(r2_neighbourhood_list, rng, r2_idx, new_tour.cities());
+            let (nl_r1, dist_r1, nl_r1_in_tour) = choose_not_immediately_preceding(
+                r1_neighbourhood_list,
+                rng,
+                r1_idx,
+                new_tour.cities(),
+            );
+            let (nl_r2, dist_r2, nl_r2_in_tour) = choose_not_immediately_preceding(
+                r2_neighbourhood_list,
+                rng,
+                r2_idx,
+                new_tour.cities(),
+            );
             let r1_prec = new_tour[before_t_star_i];
             let nl_r1_prec = new_tour.previous_idx(nl_r1_in_tour);
-            let nl_r1_succ = new_tour.next_idx(nl_r1_in_tour);
             let r2_prec_idx = new_tour.previous_idx(r2_idx);
             let r2_prec = new_tour[r2_prec_idx];
             let nl_r2_prec = new_tour.previous_idx(nl_r2_in_tour);
-            let nl_r2_succ = new_tour.next_idx(nl_r2_in_tour);
             let gain_r1 =
                 Tour::gain_from_2_opt(new_tour[nl_r1_prec], nl_r1, r1_prec, r1, dist_r1, distances);
             let gain_r2 =
                 Tour::gain_from_2_opt(new_tour[nl_r2_prec], nl_r2, r2_prec, r2, dist_r2, distances);
-            // TODO: we don't need to reverse segment in n already contructed tour; we can
+            // TODO: we don't need to reverse segment in already contructed tour; we can
             // simply construct the tour with the segment already reversed.
             if gain_r1 > gain_r2 {
-                new_tour.reverse_segment(nl_r1_in_tour, r1_idx, gain_r1);
+                new_tour.reverse_segment(nl_r1_in_tour, before_t_star_i, gain_r1);
             } else {
-                new_tour.reverse_segment(nl_r2_in_tour, r2_idx, gain_r2);
+                new_tour.reverse_segment(nl_r2_in_tour, r2_prec_idx, gain_r2);
             }
+            debug_assert_eq!(new_tour.length(), new_tour.calculate_tour_length(distances));
             new_tour
         }
     }
@@ -88,7 +96,7 @@ pub fn generate_neighbour<R: Rng>(
 
 // Original GSTM paper says "not a neighbour", qCABC paper says "not preceding".
 // I implemented qCABC, so chose "not preceding".
-fn choose_non_preceding<R: Rng>(
+fn choose_not_immediately_preceding<R: Rng>(
     neighbourhood_list: &[(CityIndex, DistanceT)],
     rng: &mut R,
     relative_to: TourIndex,
