@@ -1,5 +1,7 @@
 use crate::config::Float;
 use crate::index::CityIndex;
+use crate::qcabc::TourExt;
+use crate::tour::Tour;
 use mpi::environment::Universe;
 use mpi::{
     topology::{Process, SystemCommunicator},
@@ -82,13 +84,4 @@ macro_rules! static_assert {
             }
         };
     };
-}
-
-pub fn choose_except<R: Rng>(distrib: Uniform<usize>, except: usize, rng: &mut R) -> usize {
-    loop {
-        let number = distrib.sample(rng);
-        if number != except {
-            return number;
-        }
-    }
 }

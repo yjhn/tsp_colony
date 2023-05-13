@@ -1,4 +1,4 @@
-#![allow(dead_code, unreachable_code, unused, clippy::too_many_arguments)]
+#![allow(dead_code/*, unreachable_code*/, unused, clippy::too_many_arguments)]
 
 mod ant;
 mod arguments;
@@ -66,7 +66,7 @@ fn main() {
             eprintln!("Error parsing arguments: {}", e);
             mpi.world.abort(2)
         });
-        eprintln!("Supplied arguments: {args:#?}");
+        // eprintln!("Supplied arguments: {args:#?}");
         args
     } else {
         arguments::Args::try_parse().unwrap_or_else(|_e| process::exit(2))

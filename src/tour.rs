@@ -77,7 +77,7 @@ impl Tour {
     // }
 
     pub fn random(city_count: u16, distances: &DistanceMatrix, rng: &mut impl Rng) -> Tour {
-        assert!(city_count > 1);
+        debug_assert!(city_count > 1);
 
         let mut cities = all_cities(city_count);
         cities.shuffle(rng);
@@ -476,6 +476,59 @@ impl Tour {
     pub fn swap(&mut self, city_1: TourIndex, city_2: TourIndex) {
         self.cities.swap(city_1.into(), city_2.into());
     }
+
+    pub fn nearest_neighbour(
+        city_count: u16,
+        // starting_city: Option<CityIndex>,
+        distances: &DistanceMatrix,
+        cities_distrib: Uniform<u16>,
+        rng: &mut impl Rng,
+    ) -> Tour {
+        // let starting_city = if let Some(c) = starting_city {
+        //     c
+        // } else {
+        //     CityIndex::new(rng.gen_range(0..city_count))
+        // };
+        let starting_city = CityIndex::new(cities_distrib.sample(rng));
+
+        let mut cities = Vec::with_capacity(usize::from(city_count));
+        cities.push(starting_city);
+
+        // Still unused cities.
+        let mut unused_cities = all_cities(city_count);
+        unused_cities.swap_remove(usize::from(starting_city));
+
+        let mut tour_length = 0;
+        let mut last_added_city = starting_city;
+
+        while !unused_cities.is_empty() {
+            let mut min_distance = DistanceT::MAX;
+            let mut min_distance_city = unused_cities[0];
+            let mut min_distance_city_idx = 0;
+            for (i, c) in unused_cities.iter().copied().enumerate() {
+                let c = unused_cities[i];
+                let dist = distances[(last_added_city, c)];
+                if dist < min_distance {
+                    min_distance = dist;
+                    min_distance_city = c;
+                    min_distance_city_idx = i;
+                }
+            }
+
+            // Insert.
+            cities.push(min_distance_city);
+            last_added_city = min_distance_city;
+            tour_length += min_distance;
+            unused_cities.swap_remove(min_distance_city_idx);
+        }
+
+        tour_length += distances[(last_added_city, starting_city)];
+
+        Tour {
+            cities,
+            tour_length,
+        }
+    }
 }
 
 impl Deref for Tour {
@@ -523,6 +576,9 @@ pub trait TourFunctions {
     fn subtour(&self, first: TourIndex, last: TourIndex) -> Vec<CityIndex>;
     fn last_to_first_path(&self) -> (CityIndex, CityIndex);
     fn without_hacks(&self) -> &[CityIndex];
+
+    fn forward_by(&self, i: TourIndex, inc: usize) -> TourIndex;
+    fn backward_by(&self, i: TourIndex, dec: usize) -> TourIndex;
 }
 
 impl TourFunctions for [CityIndex] {
@@ -626,7 +682,7 @@ impl TourFunctions for [CityIndex] {
     }
 
     fn calculate_tour_length(&self, distances: &DistanceMatrix) -> DistanceT {
-        assert!(self.len() > 1);
+        debug_assert!(self.len() > 1);
 
         let mut tour_length = DistanceT::ZERO;
         for pair in self.paths() {
@@ -736,6 +792,18 @@ impl TourFunctions for [CityIndex] {
 
     fn without_hacks(&self) -> &[CityIndex] {
         &self[0..self.len() - Tour::APPENDED_HACK_ELEMENTS]
+    }
+
+    fn forward_by(&self, i: TourIndex, inc: usize) -> TourIndex {
+        TourIndex::new((usize::from(i) + inc) % self.len())
+    }
+
+    fn backward_by(&self, i: TourIndex, dec: usize) -> TourIndex {
+        if usize::from(i) < dec {
+            TourIndex::new(self.len() - dec + usize::from(i))
+        } else {
+            TourIndex::new(usize::from(i) - dec)
+        }
     }
 }
 

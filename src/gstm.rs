@@ -15,6 +15,7 @@ use crate::{
 
 // Generate neighbour from this tour.
 // A new tour V_i is constructed from T_i taking cities from T_k.
+// T_i and T_k must not be be the same or identical tour.
 pub fn generate_neighbour<R: Rng>(
     t_i: &Tour,
     t_k: &Tour,
@@ -111,8 +112,10 @@ fn choose_not_immediately_preceding<R: Rng>(
         }
     }
 }
-
+/*
 /// Returns (`before_t_star_i`, `after_t_star_i`).
+// TODO: what to do if t_i and t_k are the same? (they are cannot be the same tour,
+// but they can just happen to be identical)
 fn select_subtour<R: Rng>(
     t_i: &[CityIndex],
     t_k: &[CityIndex],
@@ -121,7 +124,7 @@ fn select_subtour<R: Rng>(
     cities_distrib: Uniform<u16>,
     rng: &mut R,
 ) -> (TourIndex, TourIndex) {
-    loop {
+    for dbg in 0.. {
         // Randomly select a city j.
         let j = TourIndex::random(cities_distrib, rng);
         let j_k = t_k[j];
@@ -151,5 +154,44 @@ fn select_subtour<R: Rng>(
         if (min_subtour_cities..=max_subtour_cities).contains(&segment_len) {
             return (before_t_star_i, after_t_star_i);
         }
+        // This exposes a bad problem: we tend to loop in this many times until we
+        // generate a valid subtour. Solution: use version of the algorithm from
+        // the original GSTM paper.
+        // if dbg > 100 {
+        // dbg!(segment_len, j, t_i, t_k); // TODO: KIMBA ČIA
+        // }
     }
+    (TourIndex::new(usize::MAX), TourIndex::new(usize::MAX))
+}*/
+
+fn select_subtour<R: Rng>(
+    t_i: &[CityIndex],
+    t_k: &[CityIndex],
+    min_subtour_cities: usize,
+    max_subtour_cities: usize,
+    cities_distrib: Uniform<u16>,
+    rng: &mut R,
+) -> (TourIndex, TourIndex) {
+    // Randomly select a city j.
+    let j = TourIndex::random(cities_distrib, rng);
+    // Number of cities in segment must be between `min_subtour_cities` and `max_subtour_cities`.
+    // We add 2 because we include before and after cities.
+    let other_dist = rng.gen_range(min_subtour_cities + 1..max_subtour_cities + 1);
+    // Randomly select direction value.
+    let fi: bool = rng.gen();
+    // T* is the open tour segment.
+    let (before_t_star_i, after_t_star_i) = if fi {
+        // Forward direction.
+        // TODO: use a distribution.
+        (j, t_i.forward_by(j, other_dist))
+    } else {
+        // Backward direction.
+        (t_i.backward_by(j, other_dist), j)
+    };
+    // assert!(
+    //     usize::from(before_t_star_i) < t_i.len() && usize::from(after_t_star_i) < t_i.len(),
+    //     "{before_t_star_i}, {after_t_star_i}, {}",
+    //     t_i.len()
+    // );
+    (before_t_star_i, after_t_star_i)
 }

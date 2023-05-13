@@ -53,6 +53,7 @@ impl TspProblem {
             number_of_cities <= usize::from(u16::MAX),
             "Number of cities cannot be greater than 16384, is {number_of_cities}"
         );
+
         let cities = {
             let coord_map = tsp.node_coords();
             let mut cities = Vec::with_capacity(number_of_cities);
@@ -67,6 +68,7 @@ impl TspProblem {
 
             cities
         };
+        assert_eq!(cities.len(), number_of_cities);
 
         let distances = Self::calculate_distances(number_of_cities, &tsp);
 

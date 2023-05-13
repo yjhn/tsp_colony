@@ -398,23 +398,6 @@ pub fn benchmark_qcabc<PD, R>(
                                             for initial_g in initial_gs.iter().copied() {
                                                 for k in ks.iter().copied() {
                                                     for capital_l in capital_ls.iter().copied() {
-                                                        let mut qcabc = QuickCombArtBeeColony::new(
-                                                            &problem,
-                                                            colony_size,
-                                                            nl_max,
-                                                            capital_l,
-                                                            p_cp,
-                                                            p_rc,
-                                                            p_l,
-                                                            l_min,
-                                                            l_max_mul,
-                                                            r,
-                                                            lowercase_q,
-                                                            initial_g,
-                                                            k,
-                                                            &mut rng,
-                                                            mpi,
-                                                        );
                                                         // Figure out where to save the results.
                                                         let mut skip = [false];
                                                         let save_file_path = if mpi.is_root {
@@ -486,6 +469,24 @@ pub fn benchmark_qcabc<PD, R>(
                                                         }
 
                                                         for run_number in 0..repeat_times {
+                                                            let mut qcabc =
+                                                                QuickCombArtBeeColony::new(
+                                                                    &problem,
+                                                                    colony_size,
+                                                                    nl_max,
+                                                                    capital_l,
+                                                                    p_cp,
+                                                                    p_rc,
+                                                                    p_l,
+                                                                    l_min,
+                                                                    l_max_mul,
+                                                                    r,
+                                                                    lowercase_q,
+                                                                    initial_g,
+                                                                    k,
+                                                                    &mut rng,
+                                                                    mpi,
+                                                                );
                                                             // for run_number in 0.. {
                                                             let run_start = Instant::now();
 
