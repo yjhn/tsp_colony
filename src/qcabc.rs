@@ -254,51 +254,62 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
             if self.algo == Algorithm::Qcabc {
                 self.onlooker_bees_phase_qcabc(&mut tour_distances, distrib_tours);
             } else {
+                self.onlooker_bees_phase_cabc(&mut tour_distances, distrib_tours);
             }
             // Scout phase.
             self.scout_bees_phase(&mut shortest_iteration_tours);
 
-            if self.mpi.world_size > 1 && self.iteration - last_exchange == self.g {
-                is_exchange_iter = true;
-                self.exchange_best_tours(&mut cpus_best_tours_buf);
-                last_exchange = self.iteration;
-                let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
-                self.set_exchange_interval(cvg_avg);
-                let (_, global_best_tour_length) =
-                    self.global_best_tour_length(&cpus_best_tours_buf);
-                if global_best_tour_length < self.global_best_tour_length {
-                    self.global_best_tour_length = global_best_tour_length;
-                    self.update_shortest_iteration_tours(
-                        global_best_tour_length,
-                        &mut shortest_iteration_tours,
-                    );
-                    if global_best_tour_length == self.tsp_problem.solution_length() {
+            if self.mpi.world_size > 1 {
+                if self.iteration - last_exchange == self.g {
+                    is_exchange_iter = true;
+                    self.exchange_best_tours(&mut cpus_best_tours_buf);
+                    last_exchange = self.iteration;
+                    let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
+                    self.set_exchange_interval(cvg_avg);
+                    let (_, global_best_tour_length) =
+                        self.global_best_tour_length(&cpus_best_tours_buf);
+                    if global_best_tour_length < self.global_best_tour_length {
+                        self.global_best_tour_length = global_best_tour_length;
+                        self.update_shortest_iteration_tours(
+                            global_best_tour_length,
+                            &mut shortest_iteration_tours,
+                        );
+                    }
+                    if self.global_best_tour_length == self.tsp_problem.solution_length() {
                         eprintln!("Globally found best tour in iteration {}", self.iteration);
                         found_optimal_tour = true;
                         break;
                     }
+                    let (fitness, shortest_tour_so_far) =
+                        self.calculate_proc_distances(&cpus_best_tours_buf, &mut proc_distances);
+
+                    let neighbour_values = self.calculate_neighbour_values(&mut proc_distances);
+                    let exchange_partner =
+                        self.select_exchange_partner(&fitness, &neighbour_values, &other_cpus);
+                    let best_partner_tour = &cpus_best_tours_buf[self
+                        .hack_tours_buf_idx(exchange_partner)
+                        ..self.hack_tours_buf_idx(exchange_partner + 1)];
+                    self.replace_worst_self_tour_with_best_partner_tour(
+                        best_partner_tour.without_hacks(),
+                        best_partner_tour.get_hack_tour_length(),
+                    );
+
+                    // if self.mpi.is_root {
+                    //     eprintln!(
+                    //         "Done an exchange on iteration {}, global best tour length {}, next exchange in {} iterations, cvg_avg {}",
+                    //         self.iteration, global_best_tour_length, self.g, cvg_avg
+                    //     );
+                    // }
                 }
-                let (fitness, shortest_tour_so_far) =
-                    self.calculate_proc_distances(&cpus_best_tours_buf, &mut proc_distances);
-
-                let neighbour_values = self.calculate_neighbour_values(&mut proc_distances);
-                let exchange_partner =
-                    self.select_exchange_partner(&fitness, &neighbour_values, &other_cpus);
-                let best_partner_tour = &cpus_best_tours_buf[self
-                    .hack_tours_buf_idx(exchange_partner)
-                    ..self.hack_tours_buf_idx(exchange_partner + 1)];
-                self.replace_worst_self_tour_with_best_partner_tour(
-                    best_partner_tour.without_hacks(),
-                    best_partner_tour.get_hack_tour_length(),
+            } else if self.best_tour.length() == self.tsp_problem.solution_length() {
+                eprintln!(
+                    "Stopping, found optimal tour in iteration {}",
+                    self.iteration
                 );
-
-                // if self.mpi.is_root {
-                //     eprintln!(
-                //         "Done an exchange on iteration {}, global best tour length {}, next exchange in {} iterations, cvg_avg {}",
-                //         self.iteration, global_best_tour_length, self.g, cvg_avg
-                //     );
-                // }
+                found_optimal_tour = true;
+                break;
             }
+
             if self.iteration == max_iterations {
                 self.exchange_best_tours(&mut cpus_best_tours_buf);
                 let (idx, global_best_tour_length) =
@@ -350,10 +361,10 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         if let Some((it, len)) = shortest_iteration_tours.last_mut() {
             if *it == self.iteration {
                 *len = length;
+                return;
             }
-        } else {
-            shortest_iteration_tours.push((self.iteration, length));
         }
+        shortest_iteration_tours.push((self.iteration, length));
     }
 
     fn hack_tours_buf_idx(&self, idx: usize) -> usize {

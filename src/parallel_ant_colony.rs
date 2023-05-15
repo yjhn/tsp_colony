@@ -188,55 +188,67 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 capital_q,
                 min_delta_tau,
             );
-            if self.iteration - last_exchange == self.g {
-                self.exchange_best_tours(&mut cpus_best_tours_buf);
-                debug_assert_eq!(self.best_tour.number_of_cities(), self.number_of_cities());
-                last_exchange = self.iteration;
-                let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
-                self.set_exchange_interval(cvg_avg);
-                let (_, global_best_tour_length) =
-                    self.global_best_tour_length(&cpus_best_tours_buf);
+            if self.mpi.world_size > 1 {
+                if self.iteration - last_exchange == self.g {
+                    self.exchange_best_tours(&mut cpus_best_tours_buf);
+                    debug_assert_eq!(self.best_tour.number_of_cities(), self.number_of_cities());
+                    last_exchange = self.iteration;
+                    let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
+                    self.set_exchange_interval(cvg_avg);
+                    let (_, global_best_tour_length) =
+                        self.global_best_tour_length(&cpus_best_tours_buf);
 
-                if global_best_tour_length < self.global_best_tour_length {
-                    self.global_best_tour_length = global_best_tour_length;
-                    self.update_shortest_iteration_tours(
-                        global_best_tour_length,
-                        &mut shortest_iteration_tours,
-                    );
-                    if global_best_tour_length == self.tsp_problem.solution_length() {
-                        found_optimal_tour = true;
-                        break;
+                    if global_best_tour_length < self.global_best_tour_length {
+                        self.global_best_tour_length = global_best_tour_length;
+                        self.update_shortest_iteration_tours(
+                            global_best_tour_length,
+                            &mut shortest_iteration_tours,
+                        );
+                        if global_best_tour_length == self.tsp_problem.solution_length() {
+                            found_optimal_tour = true;
+                            break;
+                        }
                     }
-                }
-                let (fitness, shortest_tour_so_far) = self
-                    .calculate_proc_distances_fitness(&cpus_best_tours_buf, &mut proc_distances);
+                    let (fitness, shortest_tour_so_far) = self.calculate_proc_distances_fitness(
+                        &cpus_best_tours_buf,
+                        &mut proc_distances,
+                    );
 
-                let neighbour_values = self.calculate_neighbour_values(&mut proc_distances);
-                let exchange_partner =
-                    self.select_exchange_partner(&fitness, &neighbour_values, &other_cpus);
-                // if self.mpi.is_root {
-                //     dbg!(&proc_distances);
-                // }
-                let best_partner_tour = &cpus_best_tours_buf[self
-                    .hack_tours_buf_idx(exchange_partner)
-                    ..self.hack_tours_buf_idx(exchange_partner + 1)];
-                self.update_pheromones_from_partner(
-                    &best_partner_tour[..num_cities],
-                    fitness[exchange_partner],
-                    fitness[self.mpi.rank],
-                    best_partner_tour.get_hack_tour_length(),
-                    &mut delta_tau_matrix,
-                    min_delta_tau,
-                    capital_q,
-                );
+                    let neighbour_values = self.calculate_neighbour_values(&mut proc_distances);
+                    let exchange_partner =
+                        self.select_exchange_partner(&fitness, &neighbour_values, &other_cpus);
+                    // if self.mpi.is_root {
+                    //     dbg!(&proc_distances);
+                    // }
+                    let best_partner_tour = &cpus_best_tours_buf[self
+                        .hack_tours_buf_idx(exchange_partner)
+                        ..self.hack_tours_buf_idx(exchange_partner + 1)];
+                    self.update_pheromones_from_partner(
+                        &best_partner_tour[..num_cities],
+                        fitness[exchange_partner],
+                        fitness[self.mpi.rank],
+                        best_partner_tour.get_hack_tour_length(),
+                        &mut delta_tau_matrix,
+                        min_delta_tau,
+                        capital_q,
+                    );
 
-                if self.mpi.is_root {
-                    eprintln!(
+                    if self.mpi.is_root {
+                        eprintln!(
                         "Done an exchange on iteration {}, global best tour length {}, next exchange in {} iterations, cvg_avg {}",
                         self.iteration, global_best_tour_length, self.g, cvg_avg
                     );
+                    }
                 }
+            } else if self.best_tour.length() == self.tsp_problem.solution_length() {
+                eprintln!(
+                    "Stopping found optimal tour in iteration {}",
+                    self.iteration
+                );
+                found_optimal_tour = true;
+                break;
             }
+
             if iteration_tours.is_colony_stale() {
                 eprintln!(
                     "Stopping, colony is stale (all ants likely found the same tour). Iteration {}",
