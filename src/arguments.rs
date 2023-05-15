@@ -104,8 +104,19 @@ pub enum PopulationSizes {
     Custom(Vec<u32>),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, ValueEnum)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, ValueEnum)]
 pub enum Algorithm {
     Paco,
     Qcabc,
+    Cabc,
+}
+
+impl Algorithm {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Algorithm::Paco => "PACO",
+            Algorithm::Qcabc => "qCABC",
+            Algorithm::Cabc => "CABC",
+        }
+    }
 }

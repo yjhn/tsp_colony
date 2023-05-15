@@ -20,7 +20,7 @@ mod utils;
 use std::{panic, process};
 
 use crate::{
-    arguments::{Args, PopulationSizes},
+    arguments::{Algorithm, Args, PopulationSizes},
     benchmark::{benchmark_ant_cycle, benchmark_qcabc},
     config::{paco, qcabc as abc},
     utils::Mpi,
@@ -103,7 +103,7 @@ fn main() {
     };
 
     match args.algo {
-        arguments::Algorithm::Paco => benchmark_ant_cycle::<_, config::MainRng>(
+        Algorithm::Paco => benchmark_ant_cycle::<_, config::MainRng>(
             &args.files,
             args.bench_repeat_times,
             population_sizes,
@@ -120,7 +120,8 @@ fn main() {
             &init_intensities,
             &mpi,
         ),
-        arguments::Algorithm::Qcabc => benchmark_qcabc::<_, config::MainRng>(
+        Algorithm::Qcabc | Algorithm::Cabc => benchmark_qcabc::<_, config::MainRng>(
+            args.algo,
             &args.files,
             &args.bench_results_dir,
             args.dup,

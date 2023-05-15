@@ -1,6 +1,9 @@
 //! Quick combinatorial artificial bee colony (qCABC).
 
-use std::ops::{Deref, DerefMut};
+use std::{
+    ops::{Deref, DerefMut},
+    time::Instant,
+};
 
 use mpi::traits::CommunicatorCollectives;
 use rand::{
@@ -12,6 +15,7 @@ use rand::{
 use std::cmp::max;
 
 use crate::{
+    arguments::Algorithm,
     config::{DistanceT, Float},
     gstm,
     index::CityIndex,
@@ -19,7 +23,7 @@ use crate::{
     path_usage_matrix::PathUsageMatrix,
     tour::{Tour, TourFunctions},
     tsp_problem::TspProblem,
-    utils::Mpi,
+    utils::{avg, IterateResult, Mpi},
 };
 
 pub type NeighbourMatrix = Matrix<(CityIndex, DistanceT)>;
@@ -95,10 +99,12 @@ impl Deref for TourExt {
 }
 
 pub struct QuickCombArtBeeColony<'a, R: Rng> {
+    algo: Algorithm,
     colony_size: u32,
     iteration: u32, // max iterations will be specified on method evolve_until_optimal
     tours: Vec<TourExt>,
     best_tour: Tour,
+    global_best_tour_length: DistanceT,
     worst_tour_idx: usize,
     worst_tour_length: DistanceT,
     tour_non_improvement_limit: u32,
@@ -125,6 +131,7 @@ pub struct QuickCombArtBeeColony<'a, R: Rng> {
 
 impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
     pub fn new(
+        algo: Algorithm,
         tsp_problem: &'a TspProblem,
         colony_size: u32,
         nl_max: u16, // neighbours in neighbour list
@@ -144,7 +151,10 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         let mut tours = Vec::with_capacity(colony_size as usize);
         let number_of_cities = tsp_problem.number_of_cities() as u16;
         let cities_distrib = Uniform::new(0, number_of_cities).unwrap();
-        let mut path_usage_matrix = PathUsageMatrix::new(number_of_cities);
+        let mut path_usage_matrix = PathUsageMatrix::new(
+            number_of_cities,
+            Float::from(number_of_cities) / colony_size as Float,
+        );
 
         let mut best_tour_idx = 0;
         let mut best_tour_length = DistanceT::MAX;
@@ -174,10 +184,12 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         let best_tour = tours[best_tour_idx].tour().clone();
 
         Self {
+            algo,
             colony_size,
             iteration: 0,
             tours,
             best_tour,
+            global_best_tour_length: DistanceT::MAX,
             worst_tour_idx,
             worst_tour_length,
             tour_non_improvement_limit: tour_non_improvement_limit as u32,
@@ -204,11 +216,12 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         self.colony_size
     }
 
-    pub fn iterate_until_optimal(&mut self, max_iterations: u32) -> bool {
+    // TODO: add timing info, different for exchange and non-exchange gens (averages)
+    pub fn iterate_until_optimal(&mut self, max_iterations: u32) -> IterateResult {
         let num_cities = self.number_of_cities() as u16;
         // TODO: what is the split between employed bees and foragers (onlookers)?
         // For now we will assume that all bees are both foragers and onlookers.
-        let mut found_optimal = false;
+        let mut found_optimal_tour = false;
         let distrib_tours = Uniform::new(0, self.colony_size as usize).unwrap();
         let mut tour_distances = SquareMatrix::new(self.tours.len(), 0);
 
@@ -225,50 +238,45 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         let mut proc_distances = SquareMatrix::new(world_size, 0);
         // let mut min_delta_tau = config::MIN_DELTA_TAU_INIT;
         let mut last_exchange = self.iteration;
+        let mut shortest_iteration_tours = Vec::with_capacity((max_iterations / 4) as usize);
+        let mut timing_info = Vec::with_capacity(max_iterations as usize);
 
         loop {
-            // Employed bees phase.
-            self.employed_bees_phase(distrib_tours);
-            // eprintln!(
-            //     "rank: {}, iter: {}, line: {}",
-            //     self.mpi.rank,
-            //     self.iteration,
-            //     line!()
-            // );
-
-            // Onlooker (forager) bees phase.
-            self.onlooker_bees_phase(&mut tour_distances, distrib_tours);
-            // eprintln!(
-            //     "rank: {}, iter: {}, line: {}",
-            //     self.mpi.rank,
-            //     self.iteration,
-            //     line!()
-            // );
-
-            // Scout phase.
-            self.scout_bees_phase();
-            // eprintln!(
-            //     "rank: {}, iter: {}, line: {}",
-            //     self.mpi.rank,
-            //     self.iteration,
-            //     line!()
-            // );
-
-            // dbg!(self.iteration);
+            let it_start = Instant::now();
+            let mut is_exchange_iter = false;
+            // Iterations are numbered from 1.
             self.iteration += 1;
 
-            // eprintln!("rank: {}, iteration: {}", self.mpi.rank, self.iteration);
+            // Employed bees phase.
+            self.employed_bees_phase(distrib_tours);
+
+            // Onlooker (forager) bees phase.
+            if self.algo == Algorithm::Qcabc {
+                self.onlooker_bees_phase_qcabc(&mut tour_distances, distrib_tours);
+            } else {
+            }
+            // Scout phase.
+            self.scout_bees_phase(&mut shortest_iteration_tours);
+
             if self.mpi.world_size > 1 && self.iteration - last_exchange == self.g {
+                is_exchange_iter = true;
                 self.exchange_best_tours(&mut cpus_best_tours_buf);
                 last_exchange = self.iteration;
                 let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
                 self.set_exchange_interval(cvg_avg);
                 let (_, global_best_tour_length) =
                     self.global_best_tour_length(&cpus_best_tours_buf);
-                if global_best_tour_length == self.tsp_problem.solution_length() {
-                    eprintln!("Globally found best tour is iteration {}", self.iteration);
-                    found_optimal = true;
-                    break;
+                if global_best_tour_length < self.global_best_tour_length {
+                    self.global_best_tour_length = global_best_tour_length;
+                    self.update_shortest_iteration_tours(
+                        global_best_tour_length,
+                        &mut shortest_iteration_tours,
+                    );
+                    if global_best_tour_length == self.tsp_problem.solution_length() {
+                        eprintln!("Globally found best tour in iteration {}", self.iteration);
+                        found_optimal_tour = true;
+                        break;
+                    }
                 }
                 let (fitness, shortest_tour_so_far) =
                     self.calculate_proc_distances(&cpus_best_tours_buf, &mut proc_distances);
@@ -276,9 +284,6 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
                 let neighbour_values = self.calculate_neighbour_values(&mut proc_distances);
                 let exchange_partner =
                     self.select_exchange_partner(&fitness, &neighbour_values, &other_cpus);
-                // if self.mpi.is_root {
-                //     dbg!(&proc_distances);
-                // }
                 let best_partner_tour = &cpus_best_tours_buf[self
                     .hack_tours_buf_idx(exchange_partner)
                     ..self.hack_tours_buf_idx(exchange_partner + 1)];
@@ -293,19 +298,16 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
                 //         self.iteration, global_best_tour_length, self.g, cvg_avg
                 //     );
                 // }
-            } else if self.best_tour.length() == self.tsp_problem.solution_length() {
-                eprintln!(
-                    "Stopping, reached optimal length in iteration {}",
-                    self.iteration
-                );
-                found_optimal = true;
-                break;
             }
-
             if self.iteration == max_iterations {
                 self.exchange_best_tours(&mut cpus_best_tours_buf);
                 let (idx, global_best_tour_length) =
                     self.global_best_tour_length(&cpus_best_tours_buf);
+                self.global_best_tour_length = global_best_tour_length;
+                self.update_shortest_iteration_tours(
+                    global_best_tour_length,
+                    &mut shortest_iteration_tours,
+                );
                 self.best_tour = Tour::clone_from_cities(
                     &cpus_best_tours_buf[self.hack_tours_buf_idx(idx)
                         ..(self.hack_tours_buf_idx(idx + 1) - Tour::APPENDED_HACK_ELEMENTS)],
@@ -317,9 +319,41 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
                 }
                 break;
             }
+
+            timing_info.push((it_start.elapsed().as_micros(), is_exchange_iter));
         }
 
-        found_optimal
+        let iter_time_non_exch = timing_info
+            .iter()
+            .copied()
+            .filter_map(|e| (!e.1).then_some(e.0));
+        let avg_iter_time_non_exch = avg(iter_time_non_exch);
+        let iter_time_exch = timing_info
+            .iter()
+            .copied()
+            .filter_map(|e| (e.1).then_some(e.0));
+        let avg_iter_time_exch = avg(iter_time_exch);
+
+        IterateResult {
+            found_optimal_tour,
+            shortest_iteration_tours,
+            avg_iter_time_non_exch_micros: avg_iter_time_non_exch,
+            avg_iter_time_exch_micros: avg_iter_time_exch,
+        }
+    }
+
+    fn update_shortest_iteration_tours(
+        &self,
+        length: DistanceT,
+        shortest_iteration_tours: &mut Vec<(u32, DistanceT)>,
+    ) {
+        if let Some((it, len)) = shortest_iteration_tours.last_mut() {
+            if *it == self.iteration {
+                *len = length;
+            }
+        } else {
+            shortest_iteration_tours.push((self.iteration, length));
+        }
     }
 
     fn hack_tours_buf_idx(&self, idx: usize) -> usize {
@@ -387,7 +421,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         }
     }
 
-    fn onlooker_bees_phase(
+    fn onlooker_bees_phase_qcabc(
         &mut self,
         tour_distances: &mut SquareMatrix<u16>,
         distrib_tours: Uniform<usize>,
@@ -435,7 +469,42 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         // dbg!(self.mpi.rank, self.iteration);
     }
 
-    fn scout_bees_phase(&mut self) {
+    fn onlooker_bees_phase_cabc(
+        &mut self,
+        tour_distances: &mut SquareMatrix<u16>,
+        distrib_tours: Uniform<usize>,
+    ) {
+        let distrib_weighted =
+            WeightedIndex::new(self.tours.iter().map(TourExt::prob_select_by_onlooker)).unwrap();
+        self.fill_tour_distance_matrix(tour_distances);
+        // dbg!(self.mpi.rank, self.iteration);
+        for _ in 0..self.colony_size {
+            let t_idx = distrib_weighted.sample(self.rng);
+            let threshold = self.r * self.md_i(t_idx, tour_distances);
+
+            let (t_i, t_k) = Self::choose_except(&self.tours, distrib_tours, t_idx, self.rng);
+            let v_i = gstm::generate_neighbour(
+                t_i,
+                t_k,
+                self.p_rc,
+                self.p_cp,
+                self.p_l,
+                self.l_min,
+                self.l_max,
+                &self.neighbour_lists,
+                self.tsp_problem.distances(),
+                self.cities_distrib,
+                self.distrib01,
+                self.rng,
+            );
+            if v_i.length() < t_i.length() {
+                self.tours[t_idx].set_tour(v_i, &mut self.path_usage_matrix);
+            }
+        }
+        // dbg!(self.mpi.rank, self.iteration);
+    }
+
+    fn scout_bees_phase(&mut self, shortest_iteration_tours: &mut Vec<(u32, DistanceT)>) {
         let num_cities = self.tsp_problem.number_of_cities() as u16;
         // Also, update the best and worst tours found so far.
         let (mut best_tour_idx, mut best_tour_length) = (0, DistanceT::MAX);
@@ -470,6 +539,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
             );
             // }
             self.best_tour = self.tours[best_tour_idx].tour().clone();
+            shortest_iteration_tours.push((self.iteration, self.best_tour.length()));
         }
         self.worst_tour_idx = worst_tour_idx;
         self.worst_tour_length = worst_tour_length;
@@ -510,7 +580,9 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         if cvg_avg >= 0.8 || cvg_avg <= 0.2 {
             // The formula gives the opposite result than is written in the article: when
             // convergence is low (very converged), it increases g.
+            // Original formula.
             // let new_g = self.g as Float + ((0.5 - cvg_avg) * self.k as Float);
+            // My formula.
             let new_g = self.g as Float + ((cvg_avg - 0.5) * self.k as Float);
             self.g = max(new_g as u32, 1);
         }
@@ -667,12 +739,12 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
             let number = distrib.sample(rng);
             // We must not choose identical tours. Checking if they are identical is expensive,
             // so disallow all tours of the same length.
-            if number != except {
-                let t = &tours[number];
-                // if t.length() != except_t.length() {
-                return (except_t, t);
-                // }
-            }
+            // if number != except {
+            let t = &tours[number];
+            // if t.length() != except_t.length() {
+            return (except_t, t);
+            // }
+            // }
         }
     }
 }

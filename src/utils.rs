@@ -1,4 +1,4 @@
-use crate::config::Float;
+use crate::config::{DistanceT, Float};
 use crate::index::CityIndex;
 use crate::qcabc::TourExt;
 use crate::tour::Tour;
@@ -61,6 +61,27 @@ pub fn initialize_random_seed(
     let mut global_seed_buf = if is_root { [rand::random()] } else { [0] };
     root_process.broadcast_into(&mut global_seed_buf);
     global_seed_buf[0] + rank as u64
+}
+
+pub fn avg(it: impl Iterator<Item = u128>) -> Float {
+    let mut sum = 0;
+    let mut len = 0;
+
+    for item in it {
+        sum += item;
+        len += 1;
+    }
+    if len == 0 {
+        return 0.0;
+    }
+    sum as Float / len as Float
+}
+
+pub struct IterateResult {
+    pub found_optimal_tour: bool,
+    pub shortest_iteration_tours: Vec<(u32, DistanceT)>,
+    pub avg_iter_time_non_exch_micros: Float,
+    pub avg_iter_time_exch_micros: Float,
 }
 
 pub struct Mpi<'a> {

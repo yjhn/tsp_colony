@@ -30,7 +30,7 @@ pub mod qcabc {
 
     // As defined in PACO paper.
     pub const COLONY_SIZE: usize = 40;
-    pub const MAX_ITERATIONS: u32 = 800_000;
+    pub const MAX_ITERATIONS: u32 = 800_000 / COLONY_SIZE as u32;
     pub const P_RC: Float = 0.5;
     pub const P_CP: Float = 0.8;
     pub const P_L: Float = 0.2;
@@ -38,7 +38,7 @@ pub mod qcabc {
     pub const L_MAX_MUL: Float = 0.5;
     pub const NL_MAX: u16 = 5;
     pub const R: Float = 1.0;
-    pub const CAPITAL_LS: [Float; 4] = [1.0, 2.0, 3.0, 4.0];
+    pub const CAPITAL_LS: [Float; 4] = [2.0, 3.0, 4.0, 1.0];
 }
 
 // q: how many most similar CPUs to take when calculating neighbour coefficient.
@@ -48,7 +48,7 @@ pub const INIT_G: u32 = 1;
 
 pub const K: Float = 16.0;
 // Benchmark repeat times.
-pub const REPEAT_TIMES: u32 = 50;
+pub const REPEAT_TIMES: u32 = 10;
 // Benchmark results directory.
 pub const RESULTS_DIR: &str = "results";
 

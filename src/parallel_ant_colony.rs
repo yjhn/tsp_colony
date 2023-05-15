@@ -1,6 +1,8 @@
 use crate::config::DistanceT;
 use crate::config::Zeroable;
 use crate::index::CityIndex;
+use crate::utils::avg;
+use crate::utils::IterateResult;
 use std::{cmp::max, time::Instant};
 
 use mpi::traits::CommunicatorCollectives;
@@ -30,6 +32,7 @@ pub struct PacoRunner<'a, R: Rng + SeedableRng> {
     ants: Vec<Ant>,
     rng: &'a mut R,
     best_tour: Tour,
+    global_best_tour_length: DistanceT,
     pheromone_matrix: PheromoneVisibilityMatrix,
     tsp_problem: &'a TspProblem,
     alpha: Float,
@@ -83,6 +86,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
             ants,
             rng,
             best_tour: Tour::PLACEHOLDER,
+            global_best_tour_length: DistanceT::MAX,
             pheromone_matrix,
             tsp_problem,
             alpha,
@@ -137,11 +141,11 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         self.g = init_g;
     }
 
-    pub fn iterate_until_optimal(&mut self, max_iterations: u32) -> bool {
+    pub fn iterate_until_optimal(&mut self, max_iterations: u32) -> IterateResult {
         let num_cities = self.number_of_cities();
         let distrib01 = distributions::Uniform::new(0.0, 1.0).unwrap();
 
-        let mut found_optimal = false;
+        let mut found_optimal_tour = false;
         let mut delta_tau_matrix = SquareMatrix::new(num_cities, 0.0);
 
         let world_size = self.mpi.world_size;
@@ -154,8 +158,14 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         let mut proc_distances = SquareMatrix::new(world_size, 0);
         // let mut min_delta_tau = config::MIN_DELTA_TAU_INIT;
         let mut last_exchange = self.iteration;
+        let mut shortest_iteration_tours = Vec::with_capacity((max_iterations / 4) as usize);
+        let mut timing_info = Vec::with_capacity(max_iterations as usize);
 
         loop {
+            let it_start = Instant::now();
+            let mut is_exchange_iter = false;
+            // Iterations are numbered from 1.
+            self.iteration += 1;
             // TODO: gal precomputint pheromone.powf(alpha)? Vis tiek jis keičiasi tik kitoje iteracijoje.
             // Each ant constructs a tour, keep track of the shortest and longest tours
             // found in this iteration.
@@ -166,9 +176,8 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 self.best_tour = self.ants[iteration_tours.short_tour_ant_idx]
                     .clone_tour(self.tsp_problem.distances());
                 // dbg!(self.iteration, self.best_tour.length());
+                shortest_iteration_tours.push((self.iteration, self.best_tour.length()));
             }
-
-            self.iteration += 1;
 
             let capital_q = iteration_tours.long_tour_length as Float * self.capital_q_mul;
             let min_delta_tau = capital_q / iteration_tours.short_tour_length as Float;
@@ -187,15 +196,20 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 self.set_exchange_interval(cvg_avg);
                 let (_, global_best_tour_length) =
                     self.global_best_tour_length(&cpus_best_tours_buf);
-                if global_best_tour_length == self.tsp_problem.solution_length() {
-                    found_optimal = true;
-                    break;
+
+                if global_best_tour_length < self.global_best_tour_length {
+                    self.global_best_tour_length = global_best_tour_length;
+                    self.update_shortest_iteration_tours(
+                        global_best_tour_length,
+                        &mut shortest_iteration_tours,
+                    );
+                    if global_best_tour_length == self.tsp_problem.solution_length() {
+                        found_optimal_tour = true;
+                        break;
+                    }
                 }
-                // We can't use a matrix since the order of buffers from different CPUs is not
-                // guranteed.
                 let (fitness, shortest_tour_so_far) = self
                     .calculate_proc_distances_fitness(&cpus_best_tours_buf, &mut proc_distances);
-                // min_delta_tau = capital_q / shortest_tour_so_far as Float;
 
                 let neighbour_values = self.calculate_neighbour_values(&mut proc_distances);
                 let exchange_partner =
@@ -222,15 +236,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                         self.iteration, global_best_tour_length, self.g, cvg_avg
                     );
                 }
-            } else if self.best_tour.length() == self.tsp_problem.solution_length() {
-                eprintln!(
-                    "Stopping, reached optimal length in iteration {}",
-                    self.iteration
-                );
-                found_optimal = true;
-                break;
             }
-
             if iteration_tours.is_colony_stale() {
                 eprintln!(
                     "Stopping, colony is stale (all ants likely found the same tour). Iteration {}",
@@ -242,6 +248,10 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 self.exchange_best_tours(&mut cpus_best_tours_buf);
                 let (idx, global_best_tour_length) =
                     self.global_best_tour_length(&cpus_best_tours_buf);
+                self.update_shortest_iteration_tours(
+                    global_best_tour_length,
+                    &mut shortest_iteration_tours,
+                );
                 self.best_tour = Tour::clone_from_cities(
                     &cpus_best_tours_buf[self.hack_tours_buf_idx(idx)
                         ..(self.hack_tours_buf_idx(idx + 1) - Tour::APPENDED_HACK_ELEMENTS)],
@@ -262,10 +272,40 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 );
             }
 
-            // dbg!(t.elapsed().as_nanos());
+            timing_info.push((it_start.elapsed().as_micros(), is_exchange_iter));
         }
 
-        found_optimal
+        let iter_time_non_exch = timing_info
+            .iter()
+            .copied()
+            .filter_map(|e| (!e.1).then_some(e.0));
+        let avg_iter_time_non_exch = avg(iter_time_non_exch);
+        let iter_time_exch = timing_info
+            .iter()
+            .copied()
+            .filter_map(|e| (e.1).then_some(e.0));
+        let avg_iter_time_exch = avg(iter_time_exch);
+
+        IterateResult {
+            found_optimal_tour,
+            shortest_iteration_tours,
+            avg_iter_time_non_exch_micros: avg_iter_time_non_exch,
+            avg_iter_time_exch_micros: avg_iter_time_exch,
+        }
+    }
+
+    fn update_shortest_iteration_tours(
+        &self,
+        length: DistanceT,
+        shortest_iteration_tours: &mut Vec<(u32, DistanceT)>,
+    ) {
+        if let Some((it, len)) = shortest_iteration_tours.last_mut() {
+            if *it == self.iteration {
+                *len = length;
+            }
+        } else {
+            shortest_iteration_tours.push((self.iteration, length));
+        }
     }
 
     fn hack_tours_buf_idx(&self, idx: usize) -> usize {

@@ -8,12 +8,12 @@ use mpi::traits::{Communicator, Root};
 use rand::{Rng, SeedableRng};
 use serde::Serialize;
 
-use crate::arguments::{DuplicateHandling, PopulationSizes};
+use crate::arguments::{Algorithm, DuplicateHandling, PopulationSizes};
 use crate::config::{DistanceT, Float};
 use crate::parallel_ant_colony::PacoRunner;
 use crate::qcabc::QuickCombArtBeeColony;
 use crate::tsp_problem::TspProblem;
-use crate::utils::{initialize_random_seed, Mpi};
+use crate::utils::{initialize_random_seed, IterateResult, Mpi};
 
 #[derive(Serialize)]
 struct AntCycleConstants {
@@ -35,6 +35,9 @@ struct RunResult {
     found_optimal_tour: bool,
     shortest_found_tour: DistanceT,
     iteration_reached: u32,
+    shortest_iteration_tours: Vec<(u32, DistanceT)>,
+    avg_iter_time_non_exch_micros: Float,
+    avg_iter_time_exch_micros: Float,
     duration_millis: u128,
 }
 
@@ -188,7 +191,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                                             };
 
                                             if mpi.is_root {
-                                                eprintln!(
+                                                println!(
                                                     "{}",
                                                     serde_json::to_string_pretty(&bench_config)
                                                         .unwrap()
@@ -196,27 +199,31 @@ pub fn benchmark_ant_cycle<PD, R>(
                                             }
 
                                             for run_number in 0..repeat_times {
-                                                // for run_number in 0.. {
                                                 let run_start = Instant::now();
 
-                                                // todo!("Benchmark logic goes here");
-                                                let found_optimal_tour =
-                                                    ant_cycle.iterate_until_optimal(max_iterations);
-                                                // Needed returns: found_optimal, shortest_found (per getter), iteration_reached (galima paimti per getter)
+                                                let IterateResult {
+                                                    found_optimal_tour,
+                                                    shortest_iteration_tours,
+                                                    avg_iter_time_non_exch_micros,
+                                                    avg_iter_time_exch_micros,
+                                                } = ant_cycle.iterate_until_optimal(max_iterations);
                                                 if mpi.is_root {
                                                     let run_duration = run_start.elapsed();
                                                     let result = RunResult {
                                                         run_number,
                                                         found_optimal_tour,
+                                                        shortest_iteration_tours,
                                                         shortest_found_tour: ant_cycle
                                                             .best_tour()
                                                             .length(),
                                                         iteration_reached: ant_cycle.iteration(),
                                                         duration_millis: run_duration.as_millis(),
+                                                        avg_iter_time_non_exch_micros,
+                                                        avg_iter_time_exch_micros,
                                                     };
 
                                                     // Dump partial results in case the benchmark is killed before completing all the runs.
-                                                    eprintln!(
+                                                    println!(
                                                         "{}",
                                                         serde_json::to_string_pretty(&result)
                                                             .unwrap()
@@ -224,9 +231,9 @@ pub fn benchmark_ant_cycle<PD, R>(
 
                                                     run_results.push(result);
                                                 }
-                                                if found_optimal_tour {
-                                                    break;
-                                                }
+                                                // if found_optimal_tour {
+                                                // break;
+                                                // }
                                                 ant_cycle.reset_all_state(init_g);
                                             }
 
@@ -342,6 +349,7 @@ struct QcabcConstants {
 }
 
 pub fn benchmark_qcabc<PD, R>(
+    algo: Algorithm,
     problem_paths: &[PD],
     results_dir: &str,
     duplicate_handling: DuplicateHandling,
@@ -402,8 +410,8 @@ pub fn benchmark_qcabc<PD, R>(
                                                         let mut skip = [false];
                                                         let save_file_path = if mpi.is_root {
                                                             let mut save_file_path = format!(
-                                        "{dir}/bm_qcabc_{name}_{cpus}cpus_cs{cs}_nlmax{nlmax}_pcp{pcp}_prc{prc}_pl{pl}_lmin{lmin}_lmaxm{lmax}_r{r}_q{q}_g{g}_k{k}.json",
-                                        dir=results_dir, name=problem.name(), cpus=process_count,cs=colony_size, nlmax=nl_max, pcp=p_cp, prc=p_rc, pl=p_l, lmin=l_min, lmax=l_max_mul, r=r, q=lowercase_q, g=initial_g, k=k                                     );
+                                        "{dir}/bm_{algo}_{name}_{cpus}cpus_cs{cs}_nlmax{nlmax}_pcp{pcp}_prc{prc}_pl{pl}_lmin{lmin}_lmaxm{lmax}_r{r}_q{q}_g{g}_k{k}.json",
+                                        algo=algo.as_str(), dir=results_dir, name=problem.name(), cpus=process_count,cs=colony_size, nlmax=nl_max, pcp=p_cp, prc=p_rc, pl=p_l, lmin=l_min, lmax=l_max_mul, r=r, q=lowercase_q, g=initial_g, k=k                                     );
                                                             match get_output_file_path(
                                                                 &mut save_file_path,
                                                                 results_dir,
@@ -439,7 +447,7 @@ pub fn benchmark_qcabc<PD, R>(
                                                                 optimal_length: problem
                                                                     .solution_length(),
                                                             },
-                                                            algorithm: "parallel qCABC",
+                                                            algorithm: algo.as_str(),
                                                             algorithm_constants: QcabcConstants {
                                                                 colony_size,
                                                                 max_iterations,
@@ -459,7 +467,7 @@ pub fn benchmark_qcabc<PD, R>(
                                                         };
 
                                                         if mpi.is_root {
-                                                            eprintln!(
+                                                            println!(
                                                                 "{}",
                                                                 serde_json::to_string_pretty(
                                                                     &bench_config
@@ -471,6 +479,7 @@ pub fn benchmark_qcabc<PD, R>(
                                                         for run_number in 0..repeat_times {
                                                             let mut qcabc =
                                                                 QuickCombArtBeeColony::new(
+                                                                    algo,
                                                                     &problem,
                                                                     colony_size,
                                                                     nl_max,
@@ -487,21 +496,23 @@ pub fn benchmark_qcabc<PD, R>(
                                                                     &mut rng,
                                                                     mpi,
                                                                 );
-                                                            // for run_number in 0.. {
                                                             let run_start = Instant::now();
 
-                                                            // todo!("Benchmark logic goes here");
-                                                            let found_optimal_tour = qcabc
-                                                                .iterate_until_optimal(
-                                                                    max_iterations,
-                                                                );
-                                                            // Needed returns: found_optimal, shortest_found (per getter), iteration_reached (galima paimti per getter)
+                                                            let IterateResult {
+                                                                found_optimal_tour,
+                                                                shortest_iteration_tours,
+                                                                avg_iter_time_non_exch_micros,
+                                                                avg_iter_time_exch_micros,
+                                                            } = qcabc.iterate_until_optimal(
+                                                                max_iterations,
+                                                            );
                                                             if mpi.is_root {
                                                                 let run_duration =
                                                                     run_start.elapsed();
                                                                 let result = RunResult {
                                                                     run_number,
                                                                     found_optimal_tour,
+                                                                    shortest_iteration_tours,
                                                                     shortest_found_tour: qcabc
                                                                         .best_tour()
                                                                         .length(),
@@ -509,10 +520,12 @@ pub fn benchmark_qcabc<PD, R>(
                                                                         .iteration(),
                                                                     duration_millis: run_duration
                                                                         .as_millis(),
+                                                                    avg_iter_time_non_exch_micros,
+                                                                    avg_iter_time_exch_micros,
                                                                 };
 
                                                                 // Dump partial results in case the benchmark is killed before completing all the runs.
-                                                                eprintln!(
+                                                                println!(
                                                                     "{}",
                                                                     serde_json::to_string_pretty(
                                                                         &result
@@ -522,9 +535,9 @@ pub fn benchmark_qcabc<PD, R>(
 
                                                                 run_results.push(result);
                                                             }
-                                                            if found_optimal_tour {
-                                                                break;
-                                                            }
+                                                            // if found_optimal_tour {
+                                                            // break;
+                                                            // }
                                                         }
 
                                                         let bench_duration = bench_start.elapsed();
