@@ -54,6 +54,7 @@ struct BenchmarkConfig<'a, T: Serialize> {
     problem: ShortProblemDesc<'a>,
     algorithm: &'static str,
     algorithm_constants: T,
+    benchmark_start_time_millis: u128,
     repeat_times: u32,
 }
 
@@ -62,7 +63,6 @@ struct BenchmarkConfig<'a, T: Serialize> {
 #[derive(Serialize)]
 struct BenchmarkResults<'a, T: Serialize> {
     bench_config: BenchmarkConfig<'a, T>,
-    benchmark_start_time_millis: u128,
     benchmark_duration_millis: u128,
     run_results: Vec<RunResult>,
 }
@@ -145,9 +145,9 @@ pub fn benchmark_ant_cycle<PD, R>(
                                             let mut skip = [false];
                                             let save_file_path = if mpi.is_root {
                                                 let mut save_file_path = format!(
-                                        "{dir}/bm_paco_{name}_{cpus}cpus_p{p}_q{q}_a{a}_b{b}_ro{r}_intensity{i}_k{k}_e{e}.json",
+                                        "{dir}/bm_paco_{name}_{cpus}cpus_p{p}_q{q}_a{a}_b{b}_ro{r}_intensity{i}_k{k}_e{e}_lowq{lowq}.json",
                                         dir=results_dir, name=problem.name(), cpus=process_count, p=p, q=q,
-                                        a=alpha, b=beta, r=ro, i=intense, k=k, e=exch
+                                        a=alpha, b=beta, r=ro, i=intense, k=k, e=exch, lowq=lowercase_q
                                                 );
                                                 match get_output_file_path(
                                                     &mut save_file_path,
@@ -191,6 +191,10 @@ pub fn benchmark_ant_cycle<PD, R>(
                                                     // init_g,
                                                     k: k as u32,
                                                 },
+                                                benchmark_start_time_millis: bench_start_absolute
+                                                    .duration_since(UNIX_EPOCH)
+                                                    .unwrap()
+                                                    .as_millis(),
                                                 repeat_times,
                                             };
 
@@ -248,11 +252,6 @@ pub fn benchmark_ant_cycle<PD, R>(
                                             if mpi.is_root {
                                                 let results = BenchmarkResults {
                                                     bench_config,
-                                                    benchmark_start_time_millis:
-                                                        bench_start_absolute
-                                                            .duration_since(UNIX_EPOCH)
-                                                            .unwrap()
-                                                            .as_millis(),
                                                     benchmark_duration_millis: bench_duration
                                                         .as_millis(),
                                                     run_results,
@@ -472,6 +471,11 @@ pub fn benchmark_qcabc<PD, R>(
                                                                 r,
                                                                 capital_l,
                                                             },
+                                                            benchmark_start_time_millis:
+                                                                bench_start_absolute
+                                                                    .duration_since(UNIX_EPOCH)
+                                                                    .unwrap()
+                                                                    .as_millis(),
                                                             repeat_times,
                                                         };
 
@@ -556,11 +560,6 @@ pub fn benchmark_qcabc<PD, R>(
                                                         if mpi.is_root {
                                                             let results = BenchmarkResults {
                                                                 bench_config,
-                                                                benchmark_start_time_millis:
-                                                                    bench_start_absolute
-                                                                        .duration_since(UNIX_EPOCH)
-                                                                        .unwrap()
-                                                                        .as_millis(),
                                                                 benchmark_duration_millis:
                                                                     bench_duration.as_millis(),
                                                                 run_results,

@@ -17,7 +17,7 @@ mod tsp_problem;
 mod tsplib;
 mod utils;
 
-use std::{panic, process};
+use std::{panic, path::Path, process};
 
 use crate::{
     arguments::{Algorithm, Args, PopulationSizes},
@@ -100,6 +100,13 @@ fn main() {
     } else {
         PopulationSizes::SameAsCityCount
     };
+    // Verify that all problem fiels exist.
+    for name in args.files.iter() {
+        if !Path::new(name).is_file() {
+            eprintln!("Problem file '{name}' not found, exiting");
+            mpi.world.abort(5);
+        }
+    }
 
     match args.algo {
         Algorithm::Paco => benchmark_ant_cycle::<_, config::MainRng>(
