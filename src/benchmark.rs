@@ -147,7 +147,6 @@ pub fn benchmark_ant_cycle<PD, R>(
                                     );
                                                 match get_output_file_path(
                                                     &mut save_file_path,
-                                                    results_dir,
                                                     duplicate_handling,
                                                 ) {
                                                     BenchAction::Continue => (),
@@ -262,7 +261,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                                                     duplicate_handling,
                                                 );
                                                 eprintln!("Saving results to '{save_file_path}'");
-                                                file.write_all(json.as_bytes());
+                                                file.write_all(json.as_bytes()).unwrap();
                                             }
                                         }
                                     }
@@ -284,7 +283,6 @@ enum BenchAction {
 
 fn get_output_file_path(
     candidate_path: &mut String,
-    results_dir: &str,
     duplicate_handling: DuplicateHandling,
 ) -> BenchAction {
     if Path::new(&candidate_path).exists() {
@@ -414,7 +412,6 @@ pub fn benchmark_qcabc<PD, R>(
                                         algo=algo.as_str(), dir=results_dir, name=problem.name(), cpus=process_count,cs=colony_size, nlmax=nl_max, pcp=p_cp, prc=p_rc, pl=p_l, lmin=l_min, lmax=l_max_mul, r=r, q=lowercase_q, g=initial_g, k=k                                     );
                                                             match get_output_file_path(
                                                                 &mut save_file_path,
-                                                                results_dir,
                                                                 duplicate_handling,
                                                             ) {
                                                                 BenchAction::Continue => (),
@@ -570,7 +567,8 @@ pub fn benchmark_qcabc<PD, R>(
                                                             eprintln!(
                                                             "Saving results to '{save_file_path}'"
                                                         );
-                                                            file.write_all(json.as_bytes());
+                                                            file.write_all(json.as_bytes())
+                                                                .unwrap();
                                                         }
                                                     }
                                                 }
