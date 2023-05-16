@@ -22,7 +22,7 @@ use std::{panic, process};
 use crate::{
     arguments::{Algorithm, Args, PopulationSizes},
     benchmark::{benchmark_ant_cycle, benchmark_qcabc},
-    config::{paco, qcabc as abc},
+    config::{paco, qcabc as abc, EXCHANGE_GENS},
     utils::Mpi,
 };
 use clap::Parser;
@@ -62,12 +62,10 @@ fn main() {
         }));
     }
     let args = if mpi.is_root {
-        let args = arguments::Args::try_parse().unwrap_or_else(|e| {
+        arguments::Args::try_parse().unwrap_or_else(|e| {
             eprintln!("Error parsing arguments: {}", e);
             mpi.world.abort(2)
-        });
-        // eprintln!("Supplied arguments: {args:#?}");
-        args
+        })
     } else {
         arguments::Args::try_parse().unwrap_or_else(|_e| process::exit(2))
     };
@@ -95,6 +93,7 @@ fn main() {
     let nl_maxs = args.nl_maxs.unwrap_or_else(|| vec![abc::NL_MAX]);
     let rs = args.rs.unwrap_or_else(|| vec![abc::R]);
     let capital_ls = args.capital_ls.unwrap_or_else(|| abc::CAPITAL_LS.to_vec());
+    let exchange_gens = args.exchange_gens.unwrap_or_else(|| EXCHANGE_GENS.to_vec());
 
     let population_sizes = if let Some(popsizes) = args.population_sizes {
         PopulationSizes::Custom(popsizes)
@@ -107,6 +106,7 @@ fn main() {
             &args.files,
             args.bench_repeat_times,
             population_sizes,
+            &exchange_gens,
             args.max_iterations.unwrap_or(paco::MAX_ITERATIONS),
             args.dup,
             &args.bench_results_dir,
@@ -128,6 +128,7 @@ fn main() {
             args.bench_repeat_times,
             args.max_iterations.unwrap_or(abc::MAX_ITERATIONS),
             population_sizes,
+            &exchange_gens,
             &nl_maxs,
             &p_cps,
             &p_rcs,

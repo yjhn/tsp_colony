@@ -19,12 +19,13 @@ use crate::utils::{initialize_random_seed, IterateResult, Mpi};
 struct AntCycleConstants {
     max_iterations: u32,
     population_size: u32,
+    exchange_generations: u32,
     alpha: Float,
     beta: Float,
     capital_q_mul: Float,
     ro: Float,
     lowercase_q: usize,
-    init_g: u32,
+    // init_g: u32,
     k: u32,
     init_intensity: Float,
 }
@@ -70,6 +71,7 @@ pub fn benchmark_ant_cycle<PD, R>(
     problem_paths: &[PD],
     repeat_times: u32,
     population_sizes: PopulationSizes,
+    exchange_generations: &[u32],
     max_iterations: u32,
     duplicate_handling: DuplicateHandling,
     results_dir: &str,
@@ -96,13 +98,13 @@ pub fn benchmark_ant_cycle<PD, R>(
             fs::create_dir(results_dir).unwrap();
         }
 
-        eprintln!("MPI processes: {}", mpi.world_size);
+        // eprintln!("MPI processes: {}", mpi.world_size);
     }
 
     for path in problem_paths {
-        if mpi.is_root {
-            eprintln!("Problem file name: {path}");
-        }
+        // if mpi.is_root {
+        // eprintln!("Problem file name: {path}");
+        // }
         let problem = TspProblem::from_file(path);
         let population_sizes = match population_sizes {
             PopulationSizes::SameAsCityCount => vec![problem.number_of_cities() as u32],
@@ -131,20 +133,22 @@ pub fn benchmark_ant_cycle<PD, R>(
                                 for &lowercase_q in lowercase_qs {
                                     ant_cycle.set_lowercase_q(lowercase_q);
 
-                                    for &init_g in init_gs {
-                                        ant_cycle.set_g(init_g);
+                                    // for &init_g in init_gs {
+                                    // ant_cycle.set_g(init_g);
 
-                                        for &k in ks {
-                                            ant_cycle.set_k(k as u32);
+                                    for &k in ks {
+                                        ant_cycle.set_k(k as u32);
 
+                                        for exch in exchange_generations.iter().copied() {
+                                            ant_cycle.set_g(exch);
                                             // Figure out where to save the results.
                                             let mut skip = [false];
                                             let save_file_path = if mpi.is_root {
                                                 let mut save_file_path = format!(
-                                        "{dir}/bm_paco_{name}_{cpus}cpus_p{p}_q{q}_a{a}_b{b}_ro{r}_intensity{i}.json",
+                                        "{dir}/bm_paco_{name}_{cpus}cpus_p{p}_q{q}_a{a}_b{b}_ro{r}_intensity{i}_k{k}_e{e}.json",
                                         dir=results_dir, name=problem.name(), cpus=process_count, p=p, q=q,
-                                        a=alpha, b=beta, r=ro, i=intense
-                                    );
+                                        a=alpha, b=beta, r=ro, i=intense, k=k, e=exch
+                                                );
                                                 match get_output_file_path(
                                                     &mut save_file_path,
                                                     duplicate_handling,
@@ -176,6 +180,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                                                 algorithm: "PACO",
                                                 algorithm_constants: AntCycleConstants {
                                                     population_size: p,
+                                                    exchange_generations: exch,
                                                     alpha,
                                                     beta,
                                                     capital_q_mul: q,
@@ -183,7 +188,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                                                     max_iterations,
                                                     init_intensity: intense,
                                                     lowercase_q,
-                                                    init_g,
+                                                    // init_g,
                                                     k: k as u32,
                                                 },
                                                 repeat_times,
@@ -233,7 +238,8 @@ pub fn benchmark_ant_cycle<PD, R>(
                                                 // if found_optimal_tour {
                                                 // break;
                                                 // }
-                                                ant_cycle.reset_all_state(init_g);
+                                                // ant_cycle.reset_all_state(init_g);
+                                                ant_cycle.reset_all_state(exch);
                                             }
 
                                             let bench_duration = bench_start.elapsed();
@@ -267,6 +273,7 @@ pub fn benchmark_ant_cycle<PD, R>(
                                     }
                                 }
                             }
+                            // }
                         }
                     }
                 }
@@ -333,6 +340,7 @@ fn open_output_file<P: AsRef<Path>>(path: P, duplicate_handling: DuplicateHandli
 struct QcabcConstants {
     max_iterations: u32,
     colony_size: u32,
+    exchange_generations: u32,
     nl_max: u16,
     p_cp: Float,
     p_rc: Float,
@@ -342,7 +350,7 @@ struct QcabcConstants {
     r: Float,
     capital_l: Float,
     lowercase_q: usize,
-    initial_g: u32,
+    // initial_g: u32,
     k: Float,
 }
 
@@ -354,6 +362,7 @@ pub fn benchmark_qcabc<PD, R>(
     repeat_times: u32,
     max_iterations: u32,
     colony_sizes: PopulationSizes,
+    exchange_generations: &[u32],
     nl_maxs: &[u16],
     p_cps: &[Float],
     p_rcs: &[Float],
@@ -380,13 +389,13 @@ pub fn benchmark_qcabc<PD, R>(
             fs::create_dir(results_dir).unwrap();
         }
 
-        eprintln!("MPI processes: {}", mpi.world_size);
+        // eprintln!("MPI processes: {}", mpi.world_size);
     }
 
     for path in problem_paths {
-        if mpi.is_root {
-            eprintln!("Problem file name: {path}");
-        }
+        // if mpi.is_root {
+        // eprintln!("Problem file name: {path}");
+        // }
         let problem = TspProblem::from_file(path);
         let colony_sizes = match colony_sizes {
             PopulationSizes::SameAsCityCount => vec![problem.number_of_cities() as u32],
@@ -401,15 +410,17 @@ pub fn benchmark_qcabc<PD, R>(
                                 for l_max_mul in l_max_muls.iter().copied() {
                                     for r in rs.iter().copied() {
                                         for lowercase_q in lowercase_qs.iter().copied() {
-                                            for initial_g in initial_gs.iter().copied() {
-                                                for k in ks.iter().copied() {
-                                                    for capital_l in capital_ls.iter().copied() {
+                                            // for initial_g in initial_gs.iter().copied() {
+                                            for k in ks.iter().copied() {
+                                                for capital_l in capital_ls.iter().copied() {
+                                                    for exch in exchange_generations.iter().copied()
+                                                    {
                                                         // Figure out where to save the results.
                                                         let mut skip = [false];
                                                         let save_file_path = if mpi.is_root {
                                                             let mut save_file_path = format!(
-                                        "{dir}/bm_{algo}_{name}_{cpus}cpus_cs{cs}_nlmax{nlmax}_pcp{pcp}_prc{prc}_pl{pl}_lmin{lmin}_lmaxm{lmax}_r{r}_q{q}_g{g}_k{k}.json",
-                                        algo=algo.as_str(), dir=results_dir, name=problem.name(), cpus=process_count,cs=colony_size, nlmax=nl_max, pcp=p_cp, prc=p_rc, pl=p_l, lmin=l_min, lmax=l_max_mul, r=r, q=lowercase_q, g=initial_g, k=k                                     );
+                                        "{dir}/bm_{algo}_{name}_{cpus}cpus_cs{cs}_nlmax{nlmax}_pcp{pcp}_prc{prc}_pl{pl}_lmin{lmin}_lmaxm{lmax}_r{r}_q{q}_e{e}_k{k}.json",
+                                        algo=algo.as_str(), dir=results_dir, name=problem.name(), cpus=process_count,cs=colony_size, nlmax=nl_max, pcp=p_cp, prc=p_rc, pl=p_l, lmin=l_min, lmax=l_max_mul, r=r, q=lowercase_q, e=exch, k=k                                     );
                                                             match get_output_file_path(
                                                                 &mut save_file_path,
                                                                 duplicate_handling,
@@ -447,9 +458,10 @@ pub fn benchmark_qcabc<PD, R>(
                                                             algorithm: algo.as_str(),
                                                             algorithm_constants: QcabcConstants {
                                                                 colony_size,
+                                                                exchange_generations: exch,
                                                                 max_iterations,
                                                                 lowercase_q,
-                                                                initial_g,
+                                                                // initial_g,
                                                                 k,
                                                                 l_min,
                                                                 l_max_mul,
@@ -488,7 +500,8 @@ pub fn benchmark_qcabc<PD, R>(
                                                                     l_max_mul,
                                                                     r,
                                                                     lowercase_q,
-                                                                    initial_g,
+                                                                    // initial_g,
+                                                                    exch,
                                                                     k,
                                                                     &mut rng,
                                                                     mpi,

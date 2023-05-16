@@ -15,7 +15,7 @@ impl PathUsageMatrix {
     pub fn new(number_of_cities: u16, num_cities_div_colony_size: Float) -> Self {
         Self {
             matrix: SquareMatrix::new(usize::from(number_of_cities), 0),
-            num_cities_div_colony_size,
+            num_cities_div_colony_size: num_cities_div_colony_size.powi(3), // TODO: this makes convergence (cvg) larger.
             unique_path_count: ((u32::from(number_of_cities) * u32::from(number_of_cities - 1)) / 2)
                 as Float,
         }

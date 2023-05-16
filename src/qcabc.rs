@@ -69,8 +69,8 @@ impl TourExt {
 
     pub fn set_tour(&mut self, tour: Tour, path_usage_matrix: &mut PathUsageMatrix) {
         self.fitness = Self::calc_fitness(&tour);
-        path_usage_matrix.dec_tour_paths(&self.tour);
-        path_usage_matrix.inc_tour_paths(&tour);
+        // path_usage_matrix.dec_tour_paths(&self.tour);
+        // path_usage_matrix.inc_tour_paths(&tour);
         self.tour = tour;
         self.non_improvement_iters = 0;
         // For debug purposes.
@@ -174,7 +174,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
                 worst_tour_idx = i as usize;
                 worst_tour_length = tour.length();
             }
-            path_usage_matrix.inc_tour_paths(&tour);
+            // path_usage_matrix.inc_tour_paths(&tour);
             tours.push(TourExt::new(tour));
         }
         let neighbour_lists = tsp_problem.distances().neighbourhood_lists(nl_max);
@@ -258,8 +258,8 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
                     is_exchange_iter = true;
                     self.exchange_best_tours(&mut cpus_best_tours_buf);
                     last_exchange = self.iteration;
-                    let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
-                    self.set_exchange_interval(cvg_avg);
+                    // let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
+                    // self.set_exchange_interval(cvg_avg);
                     let (fitness, global_best_tour_length) =
                         self.calculate_proc_distances(&cpus_best_tours_buf, &mut proc_distances);
                     if global_best_tour_length < self.global_best_tour_length {
@@ -545,10 +545,10 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
     }
 
     fn exchange_best_tours(&mut self, recv_buf: &mut [CityIndex]) {
-        let cvg = self.path_usage_matrix.convergence();
+        // let cvg = self.path_usage_matrix.convergence();
         // dbg!(cvg);
         // self.best_tour.hack_append_length(self.mpi.rank);
-        self.best_tour.hack_append_length_cvg(cvg);
+        self.best_tour.hack_append_length_cvg(0.0 /*cvg*/);
         self.mpi
             .world
             .all_gather_into(self.best_tour.cities(), recv_buf);
@@ -735,16 +735,17 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         rng: &mut R,
     ) -> (&'b Tour, &'b Tour) {
         let except_t = &tours[except];
-        loop {
-            let number = distrib.sample(rng);
-            // We must not choose identical tours. Checking if they are identical is expensive,
-            // so disallow all tours of the same length.
-            // if number != except {
-            let t = &tours[number];
-            // if t.length() != except_t.length() {
-            return (except_t, t);
-            // }
-            // }
-        }
+        // loop {
+        // let number = distrib.sample(rng);
+        // We must not choose identical tours. Checking if they are identical is expensive,
+        // so disallow all tours of the same length.
+        // if number != except {
+        // let t = &tours[number];
+        // if t.length() != except_t.length() {
+        let t = &tours[0]; // whatever, it is not used anyway
+        return (except_t, t);
+        // }
+        // }
+        // }
     }
 }

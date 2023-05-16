@@ -44,6 +44,8 @@ pub mod qcabc {
 // q: how many most similar CPUs to take when calculating neighbour coefficient.
 pub const LOWERCASE_Q: usize = 3;
 
+pub const EXCHANGE_GENS: [u32; 2] = [8, 32];
+
 pub const INIT_G: u32 = 1;
 
 pub const K: Float = 16.0;

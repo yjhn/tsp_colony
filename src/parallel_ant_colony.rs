@@ -187,8 +187,8 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                     self.exchange_best_tours(&mut cpus_best_tours_buf);
                     debug_assert_eq!(self.best_tour.number_of_cities(), self.number_of_cities());
                     last_exchange = self.iteration;
-                    let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
-                    self.set_exchange_interval(cvg_avg);
+                    // let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
+                    // self.set_exchange_interval(cvg_avg);
                     let (fitness, global_best_tour_length) = self.calculate_proc_distances_fitness(
                         &cpus_best_tours_buf,
                         &mut proc_distances,
@@ -333,9 +333,9 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
     }
 
     fn exchange_best_tours(&mut self, recv_buf: &mut [CityIndex]) {
-        let cvg = self.calculate_cvg();
+        // let cvg = self.calculate_cvg();
         // self.best_tour.hack_append_length(self.mpi.rank);
-        self.best_tour.hack_append_length_cvg(cvg);
+        self.best_tour.hack_append_length_cvg(0.0 /*cvg*/);
         self.mpi
             .world
             .all_gather_into(self.best_tour.cities(), recv_buf);

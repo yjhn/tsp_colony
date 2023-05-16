@@ -54,6 +54,9 @@ pub struct Args {
     /// Ant population sizes. If not specified, defaults to city count.
     pub population_sizes: Option<Vec<u32>>,
 
+    #[arg(long, num_args(1..))]
+    pub exchange_gens: Option<Vec<u32>>,
+
     // qCABC-specific options.
     #[arg(long, num_args(1..))]
     pub p_rcs: Option<Vec<Float>>,
