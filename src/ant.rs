@@ -9,7 +9,6 @@ use crate::{
     tour::{Tour, TourFunctions},
     utils::{all_cities, all_cities_fill, order, reverse_order},
 };
-use iterator_ilp::IteratorILP;
 
 pub struct Ant {
     // TODO: maybe use one vec for both visited and unvisited cities.
