@@ -174,7 +174,14 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 self.best_tour = self.ants[iteration_tours.short_tour_ant_idx]
                     .clone_tour(self.tsp_problem.distances());
                 // dbg!(self.iteration, self.best_tour.length());
-                shortest_iteration_tours.push((self.iteration, self.best_tour.length()));
+                if self.mpi.is_root {
+                    eprintln!(
+                        "New best tour in iteration {}, length {}",
+                        self.iteration,
+                        self.best_tour.length()
+                    );
+                    shortest_iteration_tours.push((self.iteration, self.best_tour.length()));
+                }
             }
 
             let capital_q = iteration_tours.long_tour_length as Float * self.capital_q_mul;

@@ -531,14 +531,14 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         // New best could be longer, because if the best tour is not improved
         // for some generations, it is replaced.
         if best_tour_length < self.best_tour.length() {
-            // if self.mpi.is_root {
-            eprintln!(
-                "New best tour in iteration {}, length {}",
-                self.iteration, best_tour_length
-            );
-            // }
             self.best_tour = self.tours[best_tour_idx].tour().clone();
-            shortest_iteration_tours.push((self.iteration, self.best_tour.length()));
+            if self.mpi.is_root {
+                eprintln!(
+                    "New best tour in iteration {}, length {}",
+                    self.iteration, best_tour_length
+                );
+                shortest_iteration_tours.push((self.iteration, self.best_tour.length()));
+            }
         }
         self.worst_tour_idx = worst_tour_idx;
         self.worst_tour_length = worst_tour_length;
