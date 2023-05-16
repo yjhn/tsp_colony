@@ -418,8 +418,8 @@ pub fn benchmark_qcabc<PD, R>(
                                                         let mut skip = [false];
                                                         let save_file_path = if mpi.is_root {
                                                             let mut save_file_path = format!(
-                                        "{dir}/bm_{algo}_{name}_{cpus}cpus_cs{cs}_nlmax{nlmax}_pcp{pcp}_prc{prc}_pl{pl}_lmin{lmin}_lmaxm{lmax}_r{r}_q{q}_e{e}_k{k}.json",
-                                        algo=algo.as_str(), dir=results_dir, name=problem.name(), cpus=process_count,cs=colony_size, nlmax=nl_max, pcp=p_cp, prc=p_rc, pl=p_l, lmin=l_min, lmax=l_max_mul, r=r, q=lowercase_q, e=exch, k=k                                     );
+                                        "{dir}/bm_{algo}_{name}_{cpus}cpus_cs{cs}_nlmax{nlmax}_pcp{pcp}_prc{prc}_pl{pl}_lmin{lmin}_lmaxm{lmax}_r{r}_q{q}_e{e}_k{k}_cl{cl}.json",
+                                        algo=algo.as_str(), dir=results_dir, name=problem.name(), cpus=process_count,cs=colony_size, nlmax=nl_max, pcp=p_cp, prc=p_rc, pl=p_l, lmin=l_min, lmax=l_max_mul, r=r, q=lowercase_q, e=exch, k=k, cl=capital_l                                     );
                                                             match get_output_file_path(
                                                                 &mut save_file_path,
                                                                 duplicate_handling,
