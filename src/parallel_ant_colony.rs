@@ -137,6 +137,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         self.pheromone_matrix
             .reset_pheromone(self.initial_trail_intensity);
         self.g = init_g;
+        self.global_best_tour_length = DistanceT::MAX;
     }
 
     pub fn iterate_until_optimal(&mut self, max_iterations: u32) -> IterateResult {
@@ -160,6 +161,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         let mut timing_info = Vec::with_capacity(max_iterations as usize);
 
         loop {
+            let mut local_tour_improved = false;
             let it_start = Instant::now();
             let mut is_exchange_iter = false;
             // Iterations are numbered from 1.
@@ -176,12 +178,19 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 // dbg!(self.iteration, self.best_tour.length());
                 if self.mpi.is_root {
                     eprintln!(
-                        "New best tour in iteration {}, length {}",
+                        "New best local tour in iteration {}, length {}",
                         self.iteration,
                         self.best_tour.length()
                     );
-                    shortest_iteration_tours.push((self.iteration, self.best_tour.length()));
                 }
+                if self.best_tour.length() < self.global_best_tour_length {
+                    self.global_best_tour_length = self.best_tour.length();
+                    self.update_shortest_iteration_tours(
+                        self.best_tour.length(),
+                        &mut shortest_iteration_tours,
+                    );
+                }
+                local_tour_improved = true;
             }
 
             let capital_q = iteration_tours.long_tour_length as Float * self.capital_q_mul;
@@ -196,12 +205,20 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                     last_exchange = self.iteration;
                     // let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
                     // self.set_exchange_interval(cvg_avg);
+                    // self.g += 6; // TODO: this is a hack that very accurately approximates
+                    // "dynamic" g updating.
                     let (fitness, global_best_tour_length) = self.calculate_proc_distances_fitness(
                         &cpus_best_tours_buf,
                         &mut proc_distances,
                     );
 
                     if global_best_tour_length < self.global_best_tour_length {
+                        if self.mpi.is_root {
+                            eprintln!(
+                                "New best global tour found in iteration {}, length {}",
+                                self.iteration, global_best_tour_length
+                            );
+                        }
                         self.global_best_tour_length = global_best_tour_length;
                         self.update_shortest_iteration_tours(
                             global_best_tour_length,
@@ -239,13 +256,19 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                     // );
                     // }
                 }
-            } else if self.best_tour.length() == self.tsp_problem.solution_length() {
-                eprintln!(
-                    "Stopping, found optimal tour in iteration {}",
-                    self.iteration
+            } else if local_tour_improved {
+                self.update_shortest_iteration_tours(
+                    self.best_tour.length(),
+                    &mut shortest_iteration_tours,
                 );
-                found_optimal_tour = true;
-                break;
+                if self.best_tour.length() == self.tsp_problem.solution_length() {
+                    eprintln!(
+                        "Stopping, found optimal tour in iteration {}",
+                        self.iteration
+                    );
+                    found_optimal_tour = true;
+                    break;
+                }
             }
 
             if iteration_tours.is_colony_stale() {
