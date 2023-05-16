@@ -1,4 +1,4 @@
-#![allow(dead_code/*, unreachable_code*/, unused, clippy::too_many_arguments)]
+#![allow(unused_imports, unused_parens, dead_code, clippy::too_many_arguments)]
 
 mod ant;
 mod arguments;
