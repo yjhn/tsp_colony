@@ -212,13 +212,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         }
     }
 
-    pub fn colony_size(&self) -> u32 {
-        self.colony_size
-    }
-
-    // TODO: add timing info, different for exchange and non-exchange gens (averages)
     pub fn iterate_until_optimal(&mut self, max_iterations: u32) -> IterateResult {
-        let num_cities = self.number_of_cities() as u16;
         // TODO: what is the split between employed bees and foragers (onlookers)?
         // For now we will assume that all bees are both foragers and onlookers.
         let mut found_optimal_tour = false;
@@ -254,7 +248,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
             if self.algo == Algorithm::Qcabc {
                 self.onlooker_bees_phase_qcabc(&mut tour_distances, distrib_tours);
             } else {
-                self.onlooker_bees_phase_cabc(&mut tour_distances, distrib_tours);
+                self.onlooker_bees_phase_cabc(distrib_tours);
             }
             // Scout phase.
             self.scout_bees_phase(&mut shortest_iteration_tours);
@@ -266,8 +260,8 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
                     last_exchange = self.iteration;
                     let cvg_avg = self.cvg_avg(&cpus_best_tours_buf);
                     self.set_exchange_interval(cvg_avg);
-                    let (_, global_best_tour_length) =
-                        self.global_best_tour_length(&cpus_best_tours_buf);
+                    let (fitness, global_best_tour_length) =
+                        self.calculate_proc_distances(&cpus_best_tours_buf, &mut proc_distances);
                     if global_best_tour_length < self.global_best_tour_length {
                         self.global_best_tour_length = global_best_tour_length;
                         self.update_shortest_iteration_tours(
@@ -280,8 +274,6 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
                         found_optimal_tour = true;
                         break;
                     }
-                    let (fitness, shortest_tour_so_far) =
-                        self.calculate_proc_distances(&cpus_best_tours_buf, &mut proc_distances);
 
                     let neighbour_values = self.calculate_neighbour_values(&mut proc_distances);
                     let exchange_partner =
@@ -295,10 +287,10 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
                     );
 
                     // if self.mpi.is_root {
-                    //     eprintln!(
-                    //         "Done an exchange on iteration {}, global best tour length {}, next exchange in {} iterations, cvg_avg {}",
-                    //         self.iteration, global_best_tour_length, self.g, cvg_avg
-                    //     );
+                    // eprintln!(
+                    // "Done an exchange on iteration {}, global best tour length {}, next exchange in {} iterations, cvg_avg {}",
+                    // self.iteration, global_best_tour_length, self.g, cvg_avg
+                    // );
                     // }
                 }
             } else if self.best_tour.length() == self.tsp_problem.solution_length() {
@@ -398,6 +390,8 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
 
     fn employed_bees_phase(&mut self, distrib_tours: Uniform<usize>) {
         for idx in 0..self.colony_size {
+            // Increase tour non-improvement iterations.
+            self.tours[idx as usize].inc_non_improvement();
             let (t_i, t_k) =
                 Self::choose_except(&self.tours, distrib_tours, idx as usize, self.rng);
             let v_i = gstm::generate_neighbour(
@@ -423,8 +417,9 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         let fit_best = self
             .tours
             .iter()
+            // Floats do not implement Ord, so we compare tours by the length.
             .map(|t| (t.length(), t.fitness()))
-            .min_by_key(|&(len, fit)| len)
+            .min_by_key(|&(len, _fit)| len)
             .unwrap()
             .1;
         for t in self.tours.iter_mut() {
@@ -454,7 +449,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
                 .filter_map(|(i, dist)| {
                     (Float::from(dist) <= threshold).then(|| (i, self.tours[i].length()))
                 })
-                .min_by_key(|&(i, length)| length)
+                .min_by_key(|&(_i, length)| length)
                 .unwrap();
 
             let (t_i, t_k) =
@@ -480,18 +475,11 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         // dbg!(self.mpi.rank, self.iteration);
     }
 
-    fn onlooker_bees_phase_cabc(
-        &mut self,
-        tour_distances: &mut SquareMatrix<u16>,
-        distrib_tours: Uniform<usize>,
-    ) {
+    fn onlooker_bees_phase_cabc(&mut self, distrib_tours: Uniform<usize>) {
         let distrib_weighted =
             WeightedIndex::new(self.tours.iter().map(TourExt::prob_select_by_onlooker)).unwrap();
-        self.fill_tour_distance_matrix(tour_distances);
-        // dbg!(self.mpi.rank, self.iteration);
         for _ in 0..self.colony_size {
             let t_idx = distrib_weighted.sample(self.rng);
-            let threshold = self.r * self.md_i(t_idx, tour_distances);
 
             let (t_i, t_k) = Self::choose_except(&self.tours, distrib_tours, t_idx, self.rng);
             let v_i = gstm::generate_neighbour(
@@ -587,6 +575,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
             )
     }
 
+    // TODO: pabandyti su fiksuotu g.
     fn set_exchange_interval(&mut self, cvg_avg: Float) {
         if cvg_avg >= 0.8 || cvg_avg <= 0.2 {
             // The formula gives the opposite result than is written in the article: when
@@ -596,6 +585,10 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
             // My formula.
             let new_g = self.g as Float + ((cvg_avg - 0.5) * self.k as Float);
             self.g = max(new_g as u32, 1);
+
+            if self.mpi.is_root && self.g > 1 {
+                dbg!(self.g);
+            }
         }
         // eprintln!("rank: {}, next exchange in {} iters", self.mpi.rank, self.g);
     }
@@ -619,10 +612,6 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
 
     pub fn best_tour(&self) -> &Tour {
         &self.best_tour
-    }
-
-    pub fn set_lowercase_q(&mut self, q: usize) {
-        self.lowercase_q = q;
     }
 
     // Since MPI all_gather_into() places buffers from different CPUs in rank order,
@@ -676,7 +665,7 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
         // eprintln!("proc_dist: {:?}", proc_distances);
         // }
         for y in 0..self.mpi.world_size {
-            let mut row = proc_distances.row_mut(y);
+            let row = proc_distances.row_mut(y);
             row.sort_unstable();
 
             // First element is going to be 0 since it is distance to self.
