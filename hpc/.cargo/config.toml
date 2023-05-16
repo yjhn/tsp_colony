@@ -1,0 +1,12 @@
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+  # use mold linked
+  "-C", "link-arg=-fuse-ld=gold",
+  # use instructions for native CPU
+  "-C", "target-cpu=native",
+  # enable identical code folding
+  "-C", "link-args=-Wl,--icf=all"
+]
+
+[registries.crates-io]
+protocol = "sparse"
