@@ -112,6 +112,7 @@ fn choose_not_immediately_preceding<R: Rng>(
         }
     }
 }
+
 /*
 /// Returns (`before_t_star_i`, `after_t_star_i`).
 // TODO: what to do if t_i and t_k are the same? (they are cannot be the same tour,
@@ -157,9 +158,9 @@ fn select_subtour<R: Rng>(
         // This exposes a bad problem: we tend to loop in this many times until we
         // generate a valid subtour. Solution: use version of the algorithm from
         // the original GSTM paper.
-        // if dbg > 100 {
-        // dbg!(segment_len, j, t_i, t_k); // TODO: KIMBA ČIA
-        // }
+        if dbg > 100000 {
+            dbg!(segment_len, j, t_i, t_k); // TODO: KIMBA ČIA
+        }
     }
     (TourIndex::new(usize::MAX), TourIndex::new(usize::MAX))
 }*/

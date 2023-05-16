@@ -177,7 +177,6 @@ impl Tour {
     }
 
     fn update_shortest(
-        self: &Self,
         current_shortest_before: &mut usize,
         current_shortest_reversed: &mut bool,
         current_shortest_added_paths_len: &mut i32,
@@ -186,8 +185,6 @@ impl Tour {
         (c1, c2): (CityIndex, CityIndex),
         distances: &DistanceMatrix,
     ) {
-        debug_assert_eq!(self.cities[c1_idx], c1);
-
         let regular_extension =
             (distances[(c1, segment_start)] + distances[(segment_end, c2)]) as i32;
         let reversed_extension =
@@ -278,7 +275,6 @@ impl Tour {
             {
                 let &[c1, c2] = path else {unreachable!()};
                 Self::update_shortest(
-                    &self,
                     &mut new_segment_before,
                     &mut reversed,
                     &mut added_paths_length,
@@ -291,7 +287,6 @@ impl Tour {
 
             // Last to first city.
             Self::update_shortest(
-                &self,
                 &mut new_segment_before,
                 &mut reversed,
                 &mut added_paths_length,
@@ -308,7 +303,6 @@ impl Tour {
             {
                 let &[c1, c2] = path else {unreachable!()};
                 Self::update_shortest(
-                    &self,
                     &mut new_segment_before,
                     &mut reversed,
                     &mut added_paths_length,
@@ -327,7 +321,6 @@ impl Tour {
             {
                 let &[c1,c2] = path else {unreachable!()};
                 Self::update_shortest(
-                    &self,
                     &mut new_segment_before,
                     &mut reversed,
                     &mut added_paths_length,
