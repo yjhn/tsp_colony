@@ -50,7 +50,7 @@ impl DistanceMatrix {
                 .enumerate()
                 .map(|(idx, dist)| (CityIndex::new(idx as u16), dist))
                 .collect();
-            neighbours.sort_unstable_by_key(|&(idx, dist)| dist);
+            neighbours.sort_unstable_by_key(|&(_idx, dist)| dist);
             // Copy neighbours to slice.
             for (elem, place_in_row) in neighbours
                 .iter()

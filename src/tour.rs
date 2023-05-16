@@ -506,7 +506,6 @@ impl Tour {
             let mut min_distance_city = unused_cities[0];
             let mut min_distance_city_idx = 0;
             for (i, c) in unused_cities.iter().copied().enumerate() {
-                let c = unused_cities[i];
                 let dist = distances[(last_added_city, c)];
                 if dist < min_distance {
                     min_distance = dist;
