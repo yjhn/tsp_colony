@@ -270,6 +270,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                     break;
                 }
             }
+            delta_tau_matrix.fill(0.0);
 
             if iteration_tours.is_colony_stale() {
                 eprintln!(
@@ -372,10 +373,6 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         self.best_tour.remove_hack_length_cvg();
     }
 
-    // fn fill_city_selection_probs(&self, probs: &mut [Float]) {
-
-    // }
-
     fn construct_ant_tours(&mut self, distrib01: Uniform<Float>) -> ShortLongIterationTours {
         let mut iteration_tours = ShortLongIterationTours {
             short_tour_ant_idx: 0,
@@ -413,7 +410,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         delta_tau_matrix: &mut SquareMatrix<Float>,
         capital_q: Float,
         min_delta_tau: Float,
-    ) -> Float {
+    ) {
         self.pheromone_matrix.evaporate_pheromone();
         // let capital_q = self.capital_q_mul * iteration_tours.long_tour_length as Float;
         // TODO: figure out if this should be calculated using best length so far or only from this iteration.
@@ -432,9 +429,6 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 );
             }
         }
-
-        delta_tau_matrix.fill(0.0);
-        min_delta_tau
     }
 
     // Since MPI all_gather_into() places buffers from different CPUs in rank order,
@@ -548,10 +542,9 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         delta_tau_min: Float,
         capital_q: Float,
     ) {
-        // evaporation is maybe unneccessary here?
-        self.pheromone_matrix.evaporate_pheromone();
         // Formula 7 in the PACO paper.
         let fit_gh = self_fitness / (self_fitness + partner_fitness);
+        let fit_hg = partner_fitness / (self_fitness + partner_fitness);
         let delta_tau_g = capital_q / self.best_tour.length() as Float;
         let delta_g = maxf(delta_tau_g, delta_tau_min);
         let delta_tau_h = capital_q / best_partner_tour_length as Float;
@@ -561,15 +554,21 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         // kolkas naudoju lokaliai suskaičiuotą
         // TODO: taip pat gauti delta_tau ir delta_tau_min iš kitų procesorių (vėlgi pridėti prie Tour galo)
         // let delta_tau = fit_gh * delta_tau_g + fit_gh * delta_tau_h;
-        let delta_tau_final_g = fit_gh * delta_g + fit_gh * delta_tau_min;
-        let delta_tau_final_h = fit_gh * delta_tau_min + fit_gh * delta_h;
+        let delta_tau_final_g = fit_gh * delta_g;
+        let delta_tau_final_h = fit_hg * delta_h;
+        let delta_tau_min_final = fit_gh * delta_tau_min + fit_hg * delta_tau_min;
         // update delta tau matrix
+        self.pheromone_matrix.evaporate_pheromone();
+        // Fill the delta tau matrix with min_delta_tau.
+        delta_tau_matrix.fill(delta_tau_min_final);
         // self best path
         self.best_tour
             .cities()
-            .update_pheromone(delta_tau_matrix, delta_tau_final_g);
+            .update_pheromone(delta_tau_matrix, delta_tau_final_g - delta_tau_min_final);
         // partner best path
-        best_partner_tour.update_pheromone(delta_tau_matrix, delta_tau_final_h);
+        best_partner_tour
+            .update_pheromone(delta_tau_matrix, delta_tau_final_h - delta_tau_min_final);
+        // Update pheromones from delta_tau_matrix.
         for x in (0..self.number_of_cities() as u16) {
             for y in 0..x {
                 let delta = delta_tau_matrix[(x.into(), y.into())];
