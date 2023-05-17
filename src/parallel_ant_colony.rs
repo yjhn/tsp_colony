@@ -270,7 +270,6 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                     break;
                 }
             }
-            delta_tau_matrix.fill(0.0);
 
             if iteration_tours.is_colony_stale() {
                 eprintln!(
@@ -429,6 +428,7 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
                 );
             }
         }
+        delta_tau_matrix.fill(0.0);
     }
 
     // Since MPI all_gather_into() places buffers from different CPUs in rank order,
@@ -554,26 +554,24 @@ impl<'a, R: Rng + SeedableRng> PacoRunner<'a, R> {
         // kolkas naudoju lokaliai suskaičiuotą
         // TODO: taip pat gauti delta_tau ir delta_tau_min iš kitų procesorių (vėlgi pridėti prie Tour galo)
         // let delta_tau = fit_gh * delta_tau_g + fit_gh * delta_tau_h;
-        let delta_tau_final_g = fit_gh * delta_g;
-        let delta_tau_final_h = fit_hg * delta_h;
-        let delta_tau_min_final = fit_gh * delta_tau_min + fit_hg * delta_tau_min;
+        let delta_tau_final_g = fit_gh * delta_g + fit_hg * delta_tau_min;
+        let delta_tau_final_h = fit_gh * delta_tau_min + fit_hg * delta_h;
         // update delta tau matrix
         self.pheromone_matrix.evaporate_pheromone();
-        // Fill the delta tau matrix with min_delta_tau.
-        delta_tau_matrix.fill(delta_tau_min_final);
         // self best path
         self.best_tour
             .cities()
-            .update_pheromone(delta_tau_matrix, delta_tau_final_g - delta_tau_min_final);
+            .update_pheromone(delta_tau_matrix, delta_tau_final_g);
         // partner best path
-        best_partner_tour
-            .update_pheromone(delta_tau_matrix, delta_tau_final_h - delta_tau_min_final);
-        // Update pheromones from delta_tau_matrix.
+        best_partner_tour.update_pheromone(delta_tau_matrix, delta_tau_final_h);
+
+        // Update pheromone matrix from delta matrix.
         for x in (0..self.number_of_cities() as u16) {
             for y in 0..x {
                 let delta = delta_tau_matrix[(x.into(), y.into())];
                 self.pheromone_matrix.adjust_pheromone(
                     (CityIndex::new(x), CityIndex::new(y)),
+                    // (fit_gh * delta_tau_min + fit_hg * delta_tau_min) == delta_tau_min
                     maxf(delta, delta_tau_min),
                 );
             }
