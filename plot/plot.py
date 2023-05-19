@@ -29,8 +29,8 @@ DEFAULT_L = 2
 # ALGO_TO_FILE_NAME_PART = {"paco": "paco", "cabc": "CABC", "qcabc": "qCABC"}
 # ALGO_TO_UPPER = {"paco": "PACO", "cabc": "CABC", "qcabc": "qCABC"}
 
-GENS_START = 99
-GENS_STEP = 100
+GENS_START = 499
+GENS_STEP = 800
 
 # GENS_NAME = "k"
 GENS_NAME = "kartos"
@@ -221,20 +221,20 @@ def main():
                             plot_dir=plot_dir,
                             add_title=add_title)
 
-    # if "cores_diff_gens" in plot_kinds:
-    #     for a in algos:
-    #         for t in test_cases:
-    #             for p in population_sizes:
-    #                 plot_cores_diff_from_opt_generations(
-    #                     directory=directory,
-    #                     test_case=t,
-    #                     algo=a,
-    #                     core_counts=core_counts,
-    #                     exc_gens=exc_gens,
-    #                     max_gens=max_generations,
-    #                     pop_size=p,
-    #                     results_dir=results_dir,
-    #                     add_title=add_title)
+    if "cores_diff_gens" in plot_kinds:
+        for a in algos:
+            for t in test_cases:
+                for e in exc_gens:
+                    plot_paco_cores_diff_from_opt_generations(
+                        all_results=all_results,
+                        test_case=t,
+                        core_counts=core_counts,
+                        exc_gens=e,
+                        max_gens=max_generations,
+                        gens_start=args.gens_start,
+                        gens_step=args.gens_step,
+                        plot_dir=plot_dir,
+                        add_title=add_title)
 
     # if "gens_diff_popsizes" in plot_kinds:
     #     for a in algos:
@@ -455,27 +455,37 @@ def plot_basic(*, directory, results_dir, algos, test_cases, core_counts,
                               add_title=add_title,
                               style={"linewidth": 1})
 
+
 def print_file_names(results: List[BenchmarkData]):
+    print("File names:")
     for r in results:
         print(r.results_file_name)
+
 
 # Core count on X axis, difference from optimal on Y,
 # different test cases in one plot.
 def plot_paco_cores_diff_from_opt_test_cases(
-        *, all_results: List[BenchmarkData], core_counts: List[int],
-        test_cases: List[str], exc_gens: int, max_gens: int, #pop_size: int,
-        plot_dir: str, add_title: bool):
+        *,
+        all_results: List[BenchmarkData],
+        core_counts: List[int],
+        test_cases: List[str],
+        exc_gens: int,
+        max_gens: int,  #pop_size: int,
+        plot_dir: str,
+        add_title: bool):
     x_values = core_counts
     xlabel = CORE_COUNT_AXIS_LABEL
     ylabel = DIFF_FROM_OPTIMAL_AXIS_LABEL
-    bench_results_algo = list(filter(
-        lambda r: r.bench_config.algorithm == "PACO" and r.bench_config.
-        algorithm_constants.exchange_generations == exc_gens, all_results))
+    bench_results_algo = list(
+        filter(
+            lambda r: r.bench_config.algorithm == "PACO" and r.bench_config.
+            algorithm_constants.exchange_generations == exc_gens, all_results))
     labels_all_test_cases = []
     diffs_all_test_cases = []
     for t in test_cases:
-        br_t = list(filter(lambda r: r.bench_config.problem.name == t,
-                      bench_results_algo))
+        br_t = list(
+            filter(lambda r: r.bench_config.problem.name == t,
+                   bench_results_algo))
         print_file_names(br_t)
         labels_all_test_cases.append(f"\\texttt{{{t}}}")
         diffs_all_core_counts = []
@@ -496,7 +506,7 @@ def plot_paco_cores_diff_from_opt_test_cases(
 
     # if len(exc_gens) == 1:
     title = f"PACO, $D_m = {exc_gens}$, $G = {max_gens}$"
-    plot_file_name = f"cores_diff_from_opt_test_cases_paco_egen_{exc_gens}_m{max_gens}"
+    plot_file_name = f"cores_diff_from_opt_test_cases_PACO_egen_{exc_gens}_m{max_gens}"
     # else:
     # title = f"{ALGO_DISPLAY_NAMES[algo]}, $K = {max_gens}$ kart\\~{{ų}}, $P = {pop_size}$"
     # plot_file_name = f"cores_diff_from_opt_test_cases_{algo}_p{pop_size}"
@@ -520,15 +530,19 @@ def plot_abc_cores_diff_from_opt_test_cases(
     x_values = core_counts
     xlabel = CORE_COUNT_AXIS_LABEL
     ylabel = DIFF_FROM_OPTIMAL_AXIS_LABEL
-    bench_results_algo = list(filter(
-        lambda r: r.bench_config.algorithm == algo and r.bench_config.
-        algorithm_constants.exchange_generations == exc_gens and r.bench_config.algorithm_constants.colony_size == pop_size, all_results))
+    bench_results_algo = list(
+        filter(
+            lambda r: r.bench_config.algorithm == algo and r.bench_config.
+            algorithm_constants.exchange_generations == exc_gens and r.
+            bench_config.algorithm_constants.colony_size == pop_size,
+            all_results))
     print_file_names(bench_results_algo)
     labels_all_test_cases = []
     diffs_all_test_cases = []
     for t in test_cases:
-        br_t = list(filter(lambda r: r.bench_config.problem.name == t,
-                      bench_results_algo))
+        br_t = list(
+            filter(lambda r: r.bench_config.problem.name == t,
+                   bench_results_algo))
         print_file_names(br_t)
         labels_all_test_cases.append(f"\\texttt{{{t}}}")
         diffs_all_core_counts = []
@@ -567,54 +581,45 @@ def plot_abc_cores_diff_from_opt_test_cases(
 
 # Core count on X axis, difference from optimal on Y,
 # plots single test case, varies generations count.
-# plots every 100 gens, up to and including max_gens
-def plot_cores_diff_from_opt_generations(*, all_results, test_case, algo,
-                                         core_counts, exc_gens, max_gens,
-                                         pop_size, results_dir, add_title):
+# plots every gens_step gens, up to but not including max_gens
+def plot_paco_cores_diff_from_opt_generations(
+        *, all_results: List[BenchmarkData], test_case: str,
+        core_counts: List[int], exc_gens: int, max_gens: int,
+        gens_start: int, gens_step: int, plot_dir: str, add_title: bool):
 
-    if len(exc_gens) == 1:
-        if GENS_NAME == "kartos":
-            title = f"{ALGO_DISPLAY_NAMES[algo]}, \\texttt{{{test_case}}}, $P = {pop_size}$"
-        elif GENS_NAME == "k":
-            title = f"{ALGO_DISPLAY_NAMES[algo]}, \\texttt{{{test_case}}}, $D_m = {exc_gens[0]}$, $P = {pop_size}$"
-        plot_file_name = f"cores_diff_from_opt_gens_{test_case}_{algo}_egen_{exc_gens[0]}_p{pop_size}"
-    else:
-        title = f"{ALGO_DISPLAY_NAMES[algo]}, \\texttt{{{test_case}}}, $P = {pop_size}$"
-        plot_file_name = f"cores_diff_from_opt_gens_{test_case}_{algo}_p{pop_size}"
+    title = f"PACO, \\texttt{{{test_case}}}, $D_m = {exc_gens}$"
+    plot_file_name = f"cores_diff_from_opt_gens_{test_case}_PACO_egen_{exc_gens}"
     x_values = core_counts
     xlabel = CORE_COUNT_AXIS_LABEL
     if DIFF == "percent":
         ylabel = DIFF_FROM_OPTIMAL_AXIS_LABEL
-    elif DIFF == "times":
-        ylabel = "skirtumas nuo optimalaus, kartai"
-    parsed_files = []
+    bench_results_algo = list(
+        filter(
+            lambda r: r.bench_config.algorithm == "PACO" and r.bench_config.
+            algorithm_constants.exchange_generations == exc_gens and r.bench_config.problem.name == test_case,
+            all_results))
     labels_all_gens_counts = []
     diffs_all_gens_counts = []
     # TODO: include generation 0
-    for g in range(GENS_START, max_gens, GENS_STEP):
+    for g in range(gens_start, max_gens, gens_step):
         if GENS_NAME == "k":
             labels_all_gens_counts.append(f"$K = {str(g + 1)}$")
         elif GENS_NAME == "kartos":
             labels_all_gens_counts.append(f"${str(g + 1)}$ kart\\~{{ų}}")
         diffs_single_gens_count = []
         for c in core_counts:
-            file_name = make_file_name(directory, test_case, algo, c, pop_size)
-            (meta, data) = parse_benchmark_results(file_name)
-            parsed_files.append((meta, data))
+            br_c = list(filter(lambda r: r.bench_config.process_count == c, bench_results_algo))
+            print_file_names(br_c)
+            assert len(br_c) == 1, f"len(br_c) = {len(br_c)}"
+            results = br_c[0]
             total = 0
-            # We are only interested in exc_gens specified.
-            required_exc_gens = filter(lambda rg: rg.exc_gens in exc_gens,
-                                       data)
-            required_exc_gens_count = 0
-            for r_group in required_exc_gens:
-                required_exc_gens_count += 1
-                for rec in r_group.records:
-                    total += rec.lengths[g]
-            avg = total / (r_group.record_count * required_exc_gens_count)
+            for rr in results.run_results:
+                total += rr.shortest_iteration_tours[g]
+            avg = total / results.bench_config.repeat_times
             if DIFF == "percent":
-                diff = percent_diff_from_optimal(avg, meta.optimal_length)
+                diff = percent_diff_from_optimal(avg, results.bench_config.problem.optimal_length)
             elif DIFF == "times":
-                diff = avg / meta.optimal_length
+                diff = avg / results.bench_config.problem.optimal_length
             diffs_single_gens_count.append(diff)
         diffs_all_gens_counts.append(diffs_single_gens_count)
 
@@ -625,7 +630,7 @@ def plot_cores_diff_from_opt_generations(*, all_results, test_case, algo,
                   xlabel=xlabel,
                   ylabel=ylabel,
                   xticks=core_counts,
-                  file_name=results_dir + plot_file_name,
+                  file_name=plot_dir + plot_file_name,
                   add_title=add_title)
 
 
