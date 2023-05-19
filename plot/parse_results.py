@@ -54,6 +54,51 @@ def from_union(fs, x):
     assert False
 
 
+# Fills up array of tuples that has gaps:
+# "shortest_iteration_tours": [
+# [
+#   3,
+#   18180
+# ],
+# [
+#   5,
+#   18165
+# ],
+# [
+#   12,
+#   18028
+# ],
+# [
+#   15,
+#   18012
+# ]
+# ]
+# Length of returned array will be expected_len.
+def flatten_fill(arr: List[List[int]], expected_len: int):
+    new_arr = []
+    # Fill up up to the first length improvement.
+    gen, length = arr[0][0], arr[0][1]
+    new_arr += [length] * gen
+    # Iterate over pairs to know how many elements to append to the
+    # new array each time.
+    for i in range(len(arr) - 1):
+        e1, e2 = arr[i], arr[i + 1]
+        gen_e1 = e1[0]
+        length_e1 = e1[1]
+        gen_e2 = e2[0]
+        window_length = gen_e2 - gen_e1
+        new_arr += [length_e1] * window_length
+
+    # If optimal length is reached, the array will have less entries.
+    # In that case, fill it up to capacity with the optimal length.
+    assert len(new_arr) == arr[-1][0]
+    if len(new_arr) < expected_len:
+        new_arr += [arr[-1][1]] * (expected_len - arr[-1][0])
+
+    assert len(new_arr) == expected_len
+    return new_arr
+
+
 # struct AntCycleConstants {
 #     max_iterations: u32,
 #     population_size: u32,
@@ -246,21 +291,23 @@ class RunResult:
     found_optimal_tour: bool
     shortest_found_tour: int
     iteration_reached: int
-    shortest_iteration_tours: List[List[int]]
+    shortest_iteration_tours: List[int]
     avg_iter_time_non_exch_micros: float
     avg_iter_time_exch_micros: float
     duration_millis: int
 
     @staticmethod
-    def from_dict(obj: Any) -> 'RunResult':
+    def from_dict(obj: Any, max_iters: int) -> 'RunResult':
         assert isinstance(obj, dict)
         run_number = from_int(obj.get("run_number"))
         found_optimal_tour = from_bool(obj.get("found_optimal_tour"))
         shortest_found_tour = from_int(obj.get("shortest_found_tour"))
         iteration_reached = from_int(obj.get("iteration_reached"))
-        shortest_iteration_tours = from_list(
+        # Fill up the sparse result array.
+        shortest_iteration_tours_raw = from_list(
             lambda x: from_list(from_int, x),
             obj.get("shortest_iteration_tours"))
+        shortest_iteration_tours = flatten_fill(shortest_iteration_tours_raw, max_iters)
         avg_iter_time_non_exch_micros = from_float(
             obj.get("avg_iter_time_non_exch_micros"))
         avg_iter_time_exch_micros = from_float(
@@ -277,8 +324,7 @@ class RunResult:
         result["found_optimal_tour"] = from_bool(self.found_optimal_tour)
         result["shortest_found_tour"] = from_int(self.shortest_found_tour)
         result["iteration_reached"] = from_int(self.iteration_reached)
-        result["shortest_iteration_tours"] = from_list(
-            lambda x: from_list(from_int, x), self.shortest_iteration_tours)
+        result["shortest_iteration_tours"] = from_list(from_int, self.shortest_iteration_tours)
         result["avg_iter_time_non_exch_micros"] = to_float(
             self.avg_iter_time_non_exch_micros)
         result["avg_iter_time_exch_micros"] = to_float(
@@ -292,16 +338,19 @@ class BenchmarkData:
     bench_config: BenchConfig
     benchmark_duration_millis: int
     run_results: List[RunResult]
+    results_file_name: str
 
     @staticmethod
-    def from_dict(obj: Any) -> 'BenchmarkData':
+    def from_dict(obj: Any, results_file_name: str) -> 'BenchmarkData':
         assert isinstance(obj, dict)
         bench_config = BenchConfig.from_dict(obj.get("bench_config"))
         benchmark_duration_millis = from_int(
             obj.get("benchmark_duration_millis"))
-        run_results = from_list(RunResult.from_dict, obj.get("run_results"))
+        run_results = []
+        for item in obj.get("run_results"):
+            run_results.append(RunResult.from_dict(item, bench_config.algorithm_constants.max_iterations))
         return BenchmarkData(bench_config, benchmark_duration_millis,
-                             run_results)
+                             run_results, results_file_name)
 
     def to_dict(self) -> dict:
         result: dict = {}
@@ -310,11 +359,12 @@ class BenchmarkData:
             self.benchmark_duration_millis)
         result["run_results"] = from_list(lambda x: to_class(RunResult, x),
                                           self.run_results)
+        result["results_file_name"] = from_str(self.results_file_name)
         return result
 
 
-def benchmark_data_from_dict(s: Any) -> BenchmarkData:
-    return BenchmarkData.from_dict(s)
+def benchmark_data_from_dict(s: Any, file_name: str) -> BenchmarkData:
+    return BenchmarkData.from_dict(s, file_name)
 
 
 def benchmark_data_to_dict(x: BenchmarkData) -> Any:
@@ -324,4 +374,4 @@ def benchmark_data_to_dict(x: BenchmarkData) -> Any:
 def read_bench_data(path: str) -> BenchmarkData:
     with open(path, 'r') as file:
         data = json.load(file)
-    return benchmark_data_from_dict(data)
+    return benchmark_data_from_dict(data, path)
