@@ -12,7 +12,7 @@ chmod -w "${results_dir}"/*.json
 set +e -x
 
 # Silence scp complaints that it is unable to write some files.
-scp -r 'hpc.mif.vu.lt:bak/results/*' "${results_dir}"
+scp -r 'hpc.mif.vu.lt:bak/results/*' "${results_dir}" 3>&1 1>&2 2>&3 3>&- | grep -vx "scp: open local .*: Permission denied."
 
 set -e +x
 
