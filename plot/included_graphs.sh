@@ -3,13 +3,26 @@
 # Generuoja grafikus kursiniam.
 # Pašalina senus grafikus jeigu tokie yra.
 
-PLOT_DIR=../../kursinis/plot
-BENCH_RESULTS_DIR=../all_bench_results
+PLOT_DIR=../../bakalaurinis/plot
+BENCH_RESULTS_DIR=../results
+# For putting two side-by-side.
+STD_SCALE=0.45
+# For one taking up full page width.
+LARGE_SCALE=0.8
+FORMAT=pgf
+PREAMBLE=python plot.py -p "${PLOT_DIR}" -d "${BENCH_RESULTS_DIR}" -f ${FORMAT}
 
 rm -Ir $PLOT_DIR
 
 # Jeigu kas nors nepavyksta, baigiam.
 set -eux
+
+
+${PREAMBLE} -a PACO -t lin318 -c 1 2 4 6 8 -e 8 32 --y-bottom 7 --y-top 20 --capital-ls 2 -k gens_diff_excg
+${PREAMBLE} -a CABC -c 1 2 4 6 8 -e 8 32 --capital-ls 2 -k gens_diff_excg
+
+
+
 
 # Grafikai tokie patys kaip straipsnyje (D_m palyginimas).
 YTOP3OPT=3.0
