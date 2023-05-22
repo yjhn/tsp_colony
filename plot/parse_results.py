@@ -87,7 +87,13 @@ def flatten_fill(arr: List[List[int]], expected_len: int):
         length_e1 = e1[1]
         gen_e2 = e2[0]
         window_length = gen_e2 - gen_e1
-        new_arr += [length_e1] * window_length
+        # Fix a bug in data output ([q]CABC): sometimes local
+        # best tour length is appended instead of gloabl best,
+        # so reported length may be larger than previous one.
+        if length_e1 > new_arr[-1]:
+            new_arr += [new_arr[-1]] * window_length
+        else:
+            new_arr += [length_e1] * window_length
 
     # If optimal length is reached, the array will have less entries.
     # In that case, fill it up to capacity with the optimal length.
