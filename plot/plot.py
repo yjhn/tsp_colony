@@ -15,7 +15,7 @@ DEFAULT_PLOT_DIR = "graphs"
 ALGOS = ["PACO", "CABC", "qCABC"]
 CORE_COUNTS = [1, 2, 4, 6, 8]
 TEST_CASES = ["eil51", "eil76", "kroA100", "kroA200", "d198", "lin318"]
-EXCHANGE_GENERATIONS = [8, 32]
+EXCHANGE_GENERATIONS = [2, 4, 8, 32]
 # <x axis>_<y axis>_<what we are comparing>
 # TODO: include graphs varying capital_l
 PLOT_KINDS = [
@@ -119,7 +119,7 @@ def main():
                         type=int,
                         nargs="+",
                         required=False,
-                        default=EXCHANGE_GENERATIONS)
+                        default=[8, 32])
     # show results after this many generations
     parser.add_argument("-g",
                         "--generation-count",
@@ -471,6 +471,9 @@ def plot_paco_gens_diff_from_opt_exc_gens(*, all_results: List[BenchmarkData],
                                           exc_gens: List[int], max_gens: int,
                                           plot_dir: str,
                                           plot_config: PlotConfig):
+    # This graph is pointless with one thread.
+    if core_count == 1:
+        return
     title = f"PACO, \\texttt{{{test_case}}}, $B = {core_count}$"
     plot_file_name = f"gens_diff_from_opt_exc_gens_{test_case}_PACO_m{max_gens}_c{core_count}"
     x_values = np.arange(1, max_gens + 1)
@@ -520,8 +523,11 @@ def plot_abc_gens_diff_from_opt_exc_gens(*, all_results: List[BenchmarkData],
                                          exc_gens: List[int], max_gens: int, capital_l: int,
                                          plot_dir: str,
                                          plot_config: PlotConfig):
+    # This graph is pointless with one thread.
+    if core_count == 1:
+        return
     title = f"{algo}, \\texttt{{{test_case}}}, $B = {core_count}$"
-    plot_file_name = f"gens_diff_from_opt_exc_gens_{test_case}_{algo}_m{max_gens}_c{core_count}_p{pop_size}"
+    plot_file_name = f"gens_diff_from_opt_exc_gens_{test_case}_{algo}_m{max_gens}_c{core_count}_p{pop_size}_cl{capital_l}"
     x_values = np.arange(1, max_gens + 1)
     xlabel = ITERATIONS_AXIS_LABEL
     ylabel = DIFF_FROM_OPTIMAL_AXIS_LABEL
