@@ -537,8 +537,13 @@ impl<'a, R: Rng> QuickCombArtBeeColony<'a, R> {
                     "New best tour in iteration {}, length {}",
                     self.iteration, best_tour_length
                 );
+            }
+        }
+        if best_tour_length < self.global_best_tour_length {
+            if self.mpi.is_root {
                 shortest_iteration_tours.push((self.iteration, self.best_tour.length()));
             }
+            self.global_best_tour_length = best_tour_length
         }
         self.worst_tour_idx = worst_tour_idx;
         self.worst_tour_length = worst_tour_length;
