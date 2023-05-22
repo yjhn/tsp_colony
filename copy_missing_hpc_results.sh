@@ -2,7 +2,9 @@
 
 set -eu
 
-results_dir="$(dirname $(realpath $0))/hpc_results"
+results_dir_name="results"
+# Get results dir relative to the script's location, not to cwd.
+results_dir="$(dirname $(realpath $0))/${results_dir_name}"
 
 echo "Removing write permission from destination files"
 # Remove write permission on existing results files, this way scp will not overwrite them.
