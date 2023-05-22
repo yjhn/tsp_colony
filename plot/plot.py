@@ -17,11 +17,10 @@ CORE_COUNTS = [1, 2, 4, 6, 8]
 TEST_CASES = ["eil51", "eil76", "kroA100", "kroA200", "d198", "lin318"]
 EXCHANGE_GENERATIONS = [2, 4, 8, 32]
 # <x axis>_<y axis>_<what we are comparing>
-# TODO: include graphs varying capital_l
 PLOT_KINDS = [
     "gens_diff_excg", "cores_diff_test_cases", "cores_diff_gens",
     "cores_diff_algos", "gens_diff_popsizes", "cores_diff_popsizes",
-    "relative_times"
+    "relative_times", "gens_diff_cls"
 ]
 MAX_GENERATIONS = 4000
 # Population is the same size as city count on PACO.
@@ -318,33 +317,70 @@ def main():
                             plot_dir=plot_dir,
                             plot_config=plot_config)
 
-    # if "gens_diff_popsizes" in plot_kinds:
-    #     for a in algos:
-    #         for t in test_cases:
-    #             for c in core_counts:
-    #                 plot_generations_diff_from_opt_pop_sizes(
-    #                     directory=directory,
-    #                     test_case=t,
-    #                     algo=a,
-    #                     core_count=c,
-    #                     exc_gens=exc_gens,
-    #                     max_gens=max_generations,
-    #                     pop_sizes=population_sizes,
-    #                     results_dir=results_dir,
-    #                     plot_config=plot_config)
+    if "gens_diff_popsizes" in plot_kinds:
+        for a in algos:
+            if a == "PACO":
+                print(
+                    "PACO algorithm does not have different population sizes")
+                continue
+            for t in test_cases:
+                for c in core_counts:
+                    for e in exc_gens:
+                        for capital_l in args.capital_ls:
+                            plot_abc_generations_diff_from_opt_pop_sizes(
+                                all_results=all_results,
+                                test_case=t,
+                                core_count=c,
+                                algo=a,
+                                exc_gens=e,
+                                capital_l=capital_l,
+                                max_gens=max_generations,
+                                pop_sizes=population_sizes,
+                                plot_dir=plot_dir,
+                                plot_config=plot_config)
 
-    # if "cores_diff_popsizes" in plot_kinds:
-    #     for a in algos:
-    #         for t in test_cases:
-    #             plot_cores_diff_from_opt_pop_sizes(directory=directory,
-    #                                                test_case=t,
-    #                                                algo=a,
-    #                                                core_counts=core_counts,
-    #                                                exc_gens=exc_gens,
-    #                                                max_gens=max_generations,
-    #                                                pop_sizes=population_sizes,
-    #                                                results_dir=results_dir,
-    #                                                plot_config=plot_config)
+    if "gens_diff_cls" in plot_kinds:
+        for a in algos:
+            for t in test_cases:
+                for c in core_counts:
+                    for e in exc_gens:
+                        for p in population_sizes:
+                            if a == "PACO":
+                                print("TODO")
+                                pass
+                            else:
+                                plot_abc_generations_diff_from_opt_capital_ls(
+                                    all_results=all_results,
+                                    test_case=t,
+                                    core_count=c,
+                                    algo=a,
+                                    exc_gens=e,
+                                    capital_ls=args.capital_ls,
+                                    max_gens=max_generations,
+                                    pop_size=p,
+                                    plot_dir=plot_dir,
+                                    plot_config=plot_config)
+
+    if "cores_diff_popsizes" in plot_kinds:
+        for a in algos:
+            if a == "PACO":
+                print(
+                    "PACO algorithm does not have different population sizes")
+                continue
+            for t in test_cases:
+                for e in exc_gens:
+                    for capital_l in args.capital_ls:
+                        plot_abc_cores_diff_from_opt_pop_sizes(
+                            all_results=all_results,
+                            test_case=t,
+                            algo=a,
+                            core_counts=core_counts,
+                            exc_gens=e,
+                            capital_l=capital_l,
+                            max_gens=max_generations,
+                            pop_sizes=population_sizes,
+                            plot_dir=plot_dir,
+                            plot_config=plot_config)
 
 
 def canonicalize_dir(directory):
@@ -473,6 +509,7 @@ def plot_paco_gens_diff_from_opt_exc_gens(*, all_results: List[BenchmarkData],
                                           plot_config: PlotConfig):
     # This graph is pointless with one thread.
     if core_count == 1:
+        print("gens_diff_excg graph is pointless with 1 core")
         return
     title = f"PACO, \\texttt{{{test_case}}}, $B = {core_count}$"
     plot_file_name = f"gens_diff_from_opt_exc_gens_{test_case}_PACO_m{max_gens}_c{core_count}"
@@ -520,11 +557,12 @@ def plot_paco_gens_diff_from_opt_exc_gens(*, all_results: List[BenchmarkData],
 def plot_abc_gens_diff_from_opt_exc_gens(*, all_results: List[BenchmarkData],
                                          test_case: str, core_count: int,
                                          pop_size: int, algo: str,
-                                         exc_gens: List[int], max_gens: int, capital_l: int,
-                                         plot_dir: str,
+                                         exc_gens: List[int], max_gens: int,
+                                         capital_l: int, plot_dir: str,
                                          plot_config: PlotConfig):
     # This graph is pointless with one thread.
     if core_count == 1:
+        print("gens_diff_excg graph is pointless with 1 core")
         return
     title = f"{algo}, \\texttt{{{test_case}}}, $B = {core_count}$"
     plot_file_name = f"gens_diff_from_opt_exc_gens_{test_case}_{algo}_m{max_gens}_c{core_count}_p{pop_size}_cl{capital_l}"
@@ -536,7 +574,8 @@ def plot_abc_gens_diff_from_opt_exc_gens(*, all_results: List[BenchmarkData],
             lambda r: r.bench_config.algorithm == algo and r.bench_config.
             problem.name == test_case and r.bench_config.algorithm_constants.
             colony_size == pop_size and r.bench_config.process_count ==
-            core_count and r.bench_config.algorithm_constants.capital_l == capital_l, all_results))
+            core_count and r.bench_config.algorithm_constants.capital_l ==
+            capital_l, all_results))
     # print_file_names(br_init)
     labels_all_exc_gens = []
     y_values = []
@@ -638,8 +677,8 @@ def plot_abc_cores_diff_from_opt_test_cases(
         filter(
             lambda r: r.bench_config.algorithm == algo and r.bench_config.
             algorithm_constants.exchange_generations == exc_gens and r.
-            bench_config.algorithm_constants.colony_size == pop_size and r.bench_config.TODO_capital_l == -3,
-            all_results))
+            bench_config.algorithm_constants.colony_size == pop_size and r.
+            bench_config.TODO_capital_l == -3, all_results))
     print_file_names(bench_results_algo)
     labels_all_test_cases = []
     diffs_all_test_cases = []
@@ -853,41 +892,40 @@ def plot_cores_diff_from_opt_algos(*, all_results: List[BenchmarkData],
 
 # Generations on X axis, difference from optimal on Y,
 # plots multiple population sizes and a single test case.
-def plot_generations_diff_from_opt_pop_sizes(*, all_results, test_case, algo,
-                                             core_count, exc_gens, max_gens,
-                                             pop_sizes, results_dir,
-                                             add_title):
-
-    if len(exc_gens) == 1:
-        title = f"{ALGO_DISPLAY_NAMES[algo]}, \\texttt{{{test_case}}}, $D_m = {exc_gens[0]}$, $B = {core_count}$"
-        plot_file_name = f"gens_diff_from_opt_pop_sizes_{test_case}_{algo}_cpus_{core_count}_mgen_{max_gens}_egen_{exc_gens[0]}"
-    else:
-        title = f"{ALGO_DISPLAY_NAMES[algo]}, \\texttt{{{test_case}}}, $B = {core_count}$"
-        plot_file_name = f"gens_diff_from_opt_pop_sizes_{test_case}_{algo}_cpus_{core_count}_mgen_{max_gens}"
+def plot_abc_generations_diff_from_opt_pop_sizes(
+        *, all_results: List[BenchmarkData], test_case: str, algo: str,
+        core_count: int, exc_gens: int, max_gens: int, pop_sizes: List[int],
+        plot_dir: str, capital_l: int, plot_config: PlotConfig):
+    title = f"{algo}, \\texttt{{{test_case}}}, $D_m = {exc_gens}$, $B = {core_count}$"
+    plot_file_name = f"gens_diff_from_opt_pop_sizes_{test_case}_{algo}_c{core_count}_mgen{max_gens}_egen{exc_gens}_cl{capital_l}"
+    br_init = list(
+        filter(
+            lambda r: r.bench_config.problem.name == test_case and r.
+            bench_config.algorithm == algo and r.bench_config.process_count ==
+            core_count and r.bench_config.algorithm_constants.
+            exchange_generations == exc_gens and r.bench_config.
+            algorithm_constants.capital_l == capital_l, all_results))
+    # print_file_names(br_init)
     x_values = np.arange(1, max_gens + 1)
     xlabel = ITERATIONS_AXIS_LABEL
     ylabel = DIFF_FROM_OPTIMAL_AXIS_LABEL
-    parsed_files = []
     labels_all_pop_sizes = []
     diffs_all_pop_sizes = []
     for p in pop_sizes:
         diffs_single_pop_size = []
         labels_all_pop_sizes.append(f"$P = {p}$")
-        for g in range(0, max_gens):
-            file_name = make_file_name(directory, test_case, algo, core_count,
-                                       p)
-            (meta, data) = parse_benchmark_results(file_name)
-            parsed_files.append((meta, data))
+        br_p = list(
+            filter(
+                lambda r: r.bench_config.algorithm_constants.colony_size == p,
+                br_init))
+        # print_file_names(br_p)
+        assert_eq(len(br_p), 1)
+        result = br_p[0]
+        for g in range(max_gens):
             total = 0
-            # We are only interested in exc_gens specified.
-            required_exc_gens = filter(lambda rg: rg.exc_gens in exc_gens,
-                                       data)
-            required_exc_gens_count = 0
-            for r_group in required_exc_gens:
-                required_exc_gens_count += 1
-                for rec in r_group.records:
-                    total += rec.lengths[g]
-            avg = total / (r_group.record_count * required_exc_gens_count)
+            for rr in result.run_results:
+                total += rr.shortest_iteration_tours[g]
+            avg = total / result.bench_config.repeat_times
             diff = percent_diff_from_optimal(avg, result)
             diffs_single_pop_size.append(diff)
         diffs_all_pop_sizes.append(diffs_single_pop_size)
@@ -898,50 +936,105 @@ def plot_generations_diff_from_opt_pop_sizes(*, all_results, test_case, algo,
                   title=title,
                   xlabel=xlabel,
                   ylabel=ylabel,
-                  file_name=results_dir + plot_file_name,
+                  file_name=plot_dir + plot_file_name,
+                  config=plot_config,
+                  style={"linewidth": 1})
+
+
+# Generations on X axis, difference from optimal on Y,
+# plots multiple Ls and a single test case.
+def plot_abc_generations_diff_from_opt_capital_ls(
+        *, all_results: List[BenchmarkData], test_case: str, algo: str,
+        core_count: int, exc_gens: int, max_gens: int, pop_size: int,
+        plot_dir: str, capital_ls: List[int], plot_config: PlotConfig):
+    title = f"{algo}, \\texttt{{{test_case}}}, $D_m = {exc_gens}$, $B = {core_count}$"
+    plot_file_name = f"gens_diff_from_opt_capital_ls_{test_case}_{algo}_c{core_count}_mgen{max_gens}_egen{exc_gens}_p{pop_size}"
+    br_init = list(
+        filter(
+            lambda r: r.bench_config.problem.name == test_case and r.
+            bench_config.algorithm == algo and r.bench_config.process_count ==
+            core_count and r.bench_config.algorithm_constants.
+            exchange_generations == exc_gens and r.bench_config.
+            algorithm_constants.colony_size == pop_size, all_results))
+    # print_file_names(br_init)
+    x_values = np.arange(1, max_gens + 1)
+    xlabel = ITERATIONS_AXIS_LABEL
+    ylabel = DIFF_FROM_OPTIMAL_AXIS_LABEL
+    labels_all_capital_ls = []
+    diffs_all_pop_sizes = []
+    for cl in capital_ls:
+        diffs_single_pop_size = []
+        labels_all_capital_ls.append(f"$L = {cl}$")
+        br_p = list(
+            filter(
+                lambda r: r.bench_config.algorithm_constants.capital_l == cl,
+                br_init))
+        # print_file_names(br_p)
+        assert_eq(len(br_p), 1)
+        result = br_p[0]
+        for g in range(max_gens):
+            total = 0
+            for rr in result.run_results:
+                total += rr.shortest_iteration_tours[g]
+            avg = total / result.bench_config.repeat_times
+            diff = percent_diff_from_optimal(avg, result)
+            diffs_single_pop_size.append(diff)
+        diffs_all_pop_sizes.append(diffs_single_pop_size)
+
+    plot_and_save(x_values=x_values,
+                  y_values=diffs_all_pop_sizes,
+                  labels=labels_all_capital_ls,
+                  title=title,
+                  xlabel=xlabel,
+                  ylabel=ylabel,
+                  file_name=plot_dir + plot_file_name,
                   config=plot_config,
                   style={"linewidth": 1})
 
 
 # Core count on X axis, difference from optimal on Y,
 # plots multiple population sizes and a single test case.
-def plot_cores_diff_from_opt_pop_sizes(*, all_results, test_case, algo,
-                                       core_counts, exc_gens, max_gens,
-                                       pop_sizes, results_dir, add_title):
+def plot_abc_cores_diff_from_opt_pop_sizes(
+        *, all_results: List[BenchmarkData], test_case: str, algo: str,
+        core_counts: List[int], exc_gens: int, max_gens: int, capital_l: int,
+        pop_sizes: List[int], plot_dir: str, plot_config: PlotConfig):
 
     popstring = '_'.join(map(str, pop_sizes))
-    if len(exc_gens) == 1:
-        if GENS_NAME == "kartos":
-            title = f"{ALGO_DISPLAY_NAMES[algo]}, \\texttt{{{test_case}}}, ${max_gens}$ kart\\~{{ų}}"
-        elif GENS_NAME == "k":
-            title = f"{ALGO_DISPLAY_NAMES[algo]}, \\texttt{{{test_case}}}, $D_m = {exc_gens[0]}$, $K = {max_gens}$"
-        plot_file_name = f"cores_diff_from_opt_pop_sizes_{test_case}_{algo}_mgen_{max_gens}_egen_{exc_gens[0]}_p{popstring}"
-    else:
-        title = f"{ALGO_DISPLAY_NAMES[algo]}, \\texttt{{{test_case}}}, $K = {max_gens}$"
-        plot_file_name = f"cores_diff_from_opt_pop_sizes_{test_case}_{algo}_mgen_{max_gens}_p{popstring}"
+    if GENS_NAME == "kartos":
+        title = f"{algo}, \\texttt{{{test_case}}}, ${max_gens}$ kart\\~{{ų}}"
+    elif GENS_NAME == "k":
+        title = f"{algo}, \\texttt{{{test_case}}}, $D_m = {exc_gens}$, $K = {max_gens}$"
+    plot_file_name = f"cores_diff_from_opt_pop_sizes_{test_case}_{algo}_mgen_{max_gens}_egen_{exc_gens}_p{popstring}"
+    br_init = list(
+        filter(
+            lambda r: r.bench_config.problem.name == test_case and r.
+            bench_config.algorithm_constants.exchange_generations == exc_gens
+            and r.bench_config.algorithm_constants.capital_l == capital_l,
+            all_results))
+    # print_file_names(br_init)
     x_values = core_counts
     xlabel = CORE_COUNT_AXIS_LABEL
     ylabel = DIFF_FROM_OPTIMAL_AXIS_LABEL
-    parsed_files = []
     labels_all_pop_sizes = []
     diffs_all_pop_sizes = []
     for p in pop_sizes:
         diffs_single_pop_size = []
         labels_all_pop_sizes.append(f"$P = {p}$")
+        br_p = list(
+            filter(
+                lambda r: r.bench_config.algorithm_constants.colony_size == p,
+                br_init))
+        # print_file_names(br_p)
         for c in core_counts:
-            file_name = make_file_name(directory, test_case, algo, c, p)
-            (meta, data) = parse_benchmark_results(file_name)
-            parsed_files.append((meta, data))
+            br_c = list(
+                filter(lambda r: r.bench_config.process_count == c, br_p))
+            # print_file_names(br_c)
+            assert_eq(len(br_c), 1)
+            result = br_c[0]
             total = 0
-            # We are only interested in exc_gens specified.
-            required_exc_gens = filter(lambda rg: rg.exc_gens in exc_gens,
-                                       data)
-            required_exc_gens_count = 0
-            for r_group in required_exc_gens:
-                required_exc_gens_count += 1
-                for rec in r_group.records:
-                    total += rec.lengths[max_gens - 1]
-            avg = total / (r_group.record_count * required_exc_gens_count)
+            for rr in result.run_results:
+                total += rr.shortest_iteration_tours[max_gens - 1]
+            avg = total / result.bench_config.repeat_times
             diff = percent_diff_from_optimal(avg, result)
             diffs_single_pop_size.append(diff)
         diffs_all_pop_sizes.append(diffs_single_pop_size)
@@ -953,7 +1046,7 @@ def plot_cores_diff_from_opt_pop_sizes(*, all_results, test_case, algo,
                   xlabel=xlabel,
                   ylabel=ylabel,
                   xticks=core_counts,
-                  file_name=results_dir + plot_file_name,
+                  file_name=plot_dir + plot_file_name,
                   config=plot_config)
 
 
