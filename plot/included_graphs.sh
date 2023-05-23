@@ -10,13 +10,14 @@ STD_SCALE=0.45
 # For one taking up full page width.
 LARGE_SCALE=0.8
 FORMAT=pgf
-PREAMBLE=python plot.py -p "${PLOT_DIR}" -d "${BENCH_RESULTS_DIR}" -f ${FORMAT}
+PREAMBLE="python plot.py -p ${PLOT_DIR} -d ${BENCH_RESULTS_DIR} -f ${FORMAT}"
 
-rm -Ir $PLOT_DIR
+echo "Removing plot dir '${PLOT_DIR}'"
+rm -Ir "${PLOT_DIR}"
+mkdir "${PLOT_DIR}"
 
 # Jeigu kas nors nepavyksta, baigiam.
 set -eux
-
 
 ${PREAMBLE} -a PACO -t lin318 -c 1 2 4 6 8 -e 8 32 --y-bottom 7 --y-top 20 --capital-ls 2 -k gens_diff_excg
 ${PREAMBLE} -a CABC -c 1 2 4 6 8 -e 8 32 --capital-ls 2 -k gens_diff_excg
