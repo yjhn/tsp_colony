@@ -12,7 +12,7 @@ LARGE_SCALE=0.8
 FORMAT=pgf
 PREAMBLE="python plot.py -p ${PLOT_DIR} -d ${BENCH_RESULTS_DIR} -f ${FORMAT}"
 
-echo "Removing plot dir '${PLOT_DIR}'"
+echo "Removing plot dir ${PLOT_DIR@Q}"
 rm -Ir "${PLOT_DIR}"
 mkdir "${PLOT_DIR}"
 
