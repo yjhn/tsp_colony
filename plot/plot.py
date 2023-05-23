@@ -10,6 +10,11 @@ from dataclasses import dataclass
 import locale
 
 locale.setlocale(locale.LC_NUMERIC, 'lt_LT.utf8')
+# Remove thousands separator by turning off grouping:
+# https://docs.python.org/3/library/locale.html#locale.localeconv
+# https://stackoverflow.com/a/51938429
+# https://stackoverflow.com/a/67186977
+locale._override_localeconv = {'grouping': [locale.CHAR_MAX]}
 
 DEFAULT_PLOT_DIR = "graphs"
 ALGOS = ["PACO", "CABC", "qCABC"]
@@ -257,16 +262,18 @@ def main():
                         plot_config=plot_config)
                 else:
                     for p in population_sizes:
-                        plot_abc_cores_diff_from_opt_test_cases(
-                            all_results=all_results,
-                            core_counts=core_counts,
-                            test_cases=test_cases,
-                            exc_gens=e,
-                            algo=a,
-                            max_gens=max_generations,
-                            pop_size=p,
-                            plot_dir=plot_dir,
-                            plot_config=plot_config)
+                        for capital_l in args.capital_ls:
+                            plot_abc_cores_diff_from_opt_test_cases(
+                                all_results=all_results,
+                                core_counts=core_counts,
+                                test_cases=test_cases,
+                                exc_gens=e,
+                                algo=a,
+                                capital_l=capital_l,
+                                max_gens=max_generations,
+                                pop_size=p,
+                                plot_dir=plot_dir,
+                                plot_config=plot_config)
 
     if "cores_diff_gens" in plot_kinds:
         for t in test_cases:
@@ -341,14 +348,14 @@ def main():
 
     if "gens_diff_cls" in plot_kinds:
         for a in algos:
-            for t in test_cases:
-                for c in core_counts:
-                    for e in exc_gens:
-                        for p in population_sizes:
-                            if a == "PACO":
-                                print("TODO")
-                                pass
-                            else:
+            if a == "PACO":
+                print("PACO does not have L parameter.")
+                continue
+            else:
+                for t in test_cases:
+                    for c in core_counts:
+                        for e in exc_gens:
+                            for p in population_sizes:
                                 plot_abc_generations_diff_from_opt_capital_ls(
                                     all_results=all_results,
                                     test_case=t,
@@ -464,7 +471,8 @@ def plot_and_save(*,
         "legend.facecolor": "grey",
         "legend.borderpad": 0.4,
         "legend.borderaxespad": 0.0,
-        "axes.formatter.use_locale": True  # use decimal separator ','
+        # use ',' decimal separator and other locale settings
+        "axes.formatter.use_locale": True
     })
     for (y, l) in zip(y_values, labels):
         plt.plot(x_values, y, label=l, **style)
@@ -475,11 +483,6 @@ def plot_and_save(*,
     plt.gca().set_ylim(top=config.y_top, bottom=config.y_bottom)
     # plt.yscale("log")
     # plt.xscale("log")
-    # Remove thousands separator.
-    plt.gca().yaxis.set_major_formatter(
-        plt.matplotlib.ticker.StrMethodFormatter('{x:.0f}'))
-    plt.gca().xaxis.set_major_formatter(
-        plt.matplotlib.ticker.StrMethodFormatter('{x:.0f}'))
     plt.legend(loc=legend_location)
     if config.add_titles:
         plt.title(title)
@@ -669,7 +672,9 @@ def plot_paco_cores_diff_from_opt_test_cases(
 def plot_abc_cores_diff_from_opt_test_cases(
         *, all_results: List[BenchmarkData], core_counts: List[int], algo: str,
         test_cases: List[str], exc_gens: int, max_gens: int, pop_size: int,
-        plot_dir: str, plot_config: PlotConfig):
+        capital_l: int, plot_dir: str, plot_config: PlotConfig):
+    title = f"{algo}, $D_m = {exc_gens}$, $P = {pop_size}$, $L = {capital_l}$"
+    plot_file_name = f"cores_diff_from_opt_test_cases_{algo}_cs{pop_size}_egen_{exc_gens}_m{max_gens}_cl{capital_l}"
     x_values = core_counts
     xlabel = CORE_COUNT_AXIS_LABEL
     ylabel = DIFF_FROM_OPTIMAL_AXIS_LABEL
@@ -678,22 +683,24 @@ def plot_abc_cores_diff_from_opt_test_cases(
             lambda r: r.bench_config.algorithm == algo and r.bench_config.
             algorithm_constants.exchange_generations == exc_gens and r.
             bench_config.algorithm_constants.colony_size == pop_size and r.
-            bench_config.TODO_capital_l == -3, all_results))
-    print_file_names(bench_results_algo)
+            bench_config.algorithm_constants.capital_l == capital_l,
+            all_results))
+    # print_file_names(bench_results_algo)
     labels_all_test_cases = []
     diffs_all_test_cases = []
     for t in test_cases:
         br_t = list(
             filter(lambda r: r.bench_config.problem.name == t,
                    bench_results_algo))
-        print_file_names(br_t)
+        # print("t: ", t)
+        # print_file_names(br_t)
         labels_all_test_cases.append(f"\\texttt{{{t}}}")
         diffs_all_core_counts = []
         for c in core_counts:
             br_c = list(
                 filter(lambda r: r.bench_config.process_count == c, br_t))
-            # There must be exactly one file left satisfying all the conditions.
-            assert_eq(len(br_c), 1, msg=f"len(br_c) = {len(br_c)}")
+            # print("c: ", c)
+            assert_eq(len(br_c), 1)
             results = br_c[0]
             total = 0
             for rr in results.run_results:
@@ -702,13 +709,6 @@ def plot_abc_cores_diff_from_opt_test_cases(
             diff = percent_diff_from_optimal(avg, results)
             diffs_all_core_counts.append(diff)
         diffs_all_test_cases.append(diffs_all_core_counts)
-
-    # if len(exc_gens) == 1:
-    title = f"{algo}, $D_m = {exc_gens}$, $P = {pop_size}$, $G = {max_gens}$"
-    plot_file_name = f"cores_diff_from_opt_test_cases_{algo}_cs{pop_size}_egen_{exc_gens}_m{max_gens}"
-    # else:
-    # title = f"{ALGO_DISPLAY_NAMES[algo]}, $K = {max_gens}$ kart\\~{{ų}}, $P = {pop_size}$"
-    # plot_file_name = f"cores_diff_from_opt_test_cases_{algo}_p{pop_size}"
 
     plot_and_save(x_values=x_values,
                   y_values=diffs_all_test_cases,
