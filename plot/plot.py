@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 # For number formatting.
 import locale
+
 locale.setlocale(locale.LC_NUMERIC, 'lt_LT.utf8')
 # Remove thousands separator by turning off grouping:
 # https://docs.python.org/3/library/locale.html#locale.localeconv
@@ -22,9 +23,14 @@ TEST_CASES = ["eil51", "eil76", "kroA100", "kroA200", "d198", "lin318"]
 EXCHANGE_GENERATIONS = [2, 4, 8, 32]
 # <x axis>_<y axis>_<what we are comparing>
 PLOT_KINDS = [
-    "gens_diff_excg", "cores_diff_test_cases", "cores_diff_gens",
-    "cores_diff_algos", "gens_diff_popsizes", "cores_diff_popsizes",
-    "relative_times", "gens_diff_cls",
+    "gens_diff_excg",
+    "cores_diff_test_cases",
+    "cores_diff_gens",
+    "cores_diff_algos",
+    "gens_diff_popsizes",
+    "cores_diff_popsizes",
+    "relative_times",
+    "gens_diff_cls",
     "cores_diff_cls"  # neįdomus, turbūt nenaudosiu
 ]
 MAX_GENERATIONS = 4000
@@ -1024,8 +1030,10 @@ def plot_abc_cores_diff_from_opt_capital_ls(
     br_init = list(
         filter(
             lambda r: r.bench_config.problem.name == test_case and r.
-            bench_config.algorithm == algo and r.bench_config.algorithm_constants.
-            exchange_generations == exc_gens and r.bench_config.algorithm_constants.colony_size == pop_size, all_results))
+            bench_config.algorithm == algo and r.bench_config.
+            algorithm_constants.exchange_generations == exc_gens and r.
+            bench_config.algorithm_constants.colony_size == pop_size,
+            all_results))
     # print_file_names(br_init)
     x_values = core_counts
     xlabel = CORE_COUNT_AXIS_LABEL
@@ -1041,7 +1049,8 @@ def plot_abc_cores_diff_from_opt_capital_ls(
         # print_file_names(br_p)
         diffs_single_cl = []
         for c in core_counts:
-            br_c = list(filter(lambda r: r.bench_config.process_count == c, br_cl))
+            br_c = list(
+                filter(lambda r: r.bench_config.process_count == c, br_cl))
             assert_eq(len(br_c), 1)
             result = br_c[0]
             total = 0
