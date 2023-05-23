@@ -6,9 +6,8 @@ import numpy as np
 from parse_results import read_bench_data, BenchmarkData, RunResult, BenchConfig, AlgorithmConstants
 from dataclasses import dataclass
 
-# For number decimal separator formatting.
+# For number formatting.
 import locale
-
 locale.setlocale(locale.LC_NUMERIC, 'lt_LT.utf8')
 # Remove thousands separator by turning off grouping:
 # https://docs.python.org/3/library/locale.html#locale.localeconv
@@ -25,7 +24,8 @@ EXCHANGE_GENERATIONS = [2, 4, 8, 32]
 PLOT_KINDS = [
     "gens_diff_excg", "cores_diff_test_cases", "cores_diff_gens",
     "cores_diff_algos", "gens_diff_popsizes", "cores_diff_popsizes",
-    "relative_times", "gens_diff_cls"
+    "relative_times", "gens_diff_cls",
+    "cores_diff_cls"  # neįdomus, turbūt nenaudosiu
 ]
 MAX_GENERATIONS = 4000
 # Population is the same size as city count on PACO.
@@ -367,6 +367,27 @@ def main():
                                     pop_size=p,
                                     plot_dir=plot_dir,
                                     plot_config=plot_config)
+
+    if "cores_diff_cls" in plot_kinds:
+        for a in algos:
+            if a == "PACO":
+                print("PACO does not have L parameter.")
+                continue
+            else:
+                for t in test_cases:
+                    for e in exc_gens:
+                        for p in population_sizes:
+                            plot_abc_cores_diff_from_opt_capital_ls(
+                                all_results=all_results,
+                                test_case=t,
+                                core_counts=core_counts,
+                                algo=a,
+                                exc_gens=e,
+                                capital_ls=args.capital_ls,
+                                max_gens=max_generations,
+                                pop_size=p,
+                                plot_dir=plot_dir,
+                                plot_config=plot_config)
 
     if "cores_diff_popsizes" in plot_kinds:
         for a in algos:
@@ -990,6 +1011,56 @@ def plot_abc_generations_diff_from_opt_capital_ls(
                   file_name=plot_dir + plot_file_name,
                   config=plot_config,
                   style={"linewidth": 1})
+
+
+# Core count on X axis, difference from optimal on Y,
+# plots multiple Ls and a single test case.
+def plot_abc_cores_diff_from_opt_capital_ls(
+        *, all_results: List[BenchmarkData], test_case: str, algo: str,
+        core_counts: List[int], exc_gens: int, max_gens: int, pop_size: int,
+        plot_dir: str, capital_ls: List[int], plot_config: PlotConfig):
+    title = f"{algo}, \\texttt{{{test_case}}}, $D_m = {exc_gens}$, $P = {pop_size}"
+    plot_file_name = f"cores_diff_from_opt_capital_ls_{test_case}_{algo}_mgen{max_gens}_egen{exc_gens}_p{pop_size}"
+    br_init = list(
+        filter(
+            lambda r: r.bench_config.problem.name == test_case and r.
+            bench_config.algorithm == algo and r.bench_config.algorithm_constants.
+            exchange_generations == exc_gens and r.bench_config.algorithm_constants.colony_size == pop_size, all_results))
+    # print_file_names(br_init)
+    x_values = core_counts
+    xlabel = CORE_COUNT_AXIS_LABEL
+    ylabel = DIFF_FROM_OPTIMAL_AXIS_LABEL
+    labels_all_pop_sizes = []
+    diffs_all_cls = []
+    for cl in capital_ls:
+        labels_all_pop_sizes.append(f"$L = {cl}$")
+        br_cl = list(
+            filter(
+                lambda r: r.bench_config.algorithm_constants.capital_l == cl,
+                br_init))
+        # print_file_names(br_p)
+        diffs_single_cl = []
+        for c in core_counts:
+            br_c = list(filter(lambda r: r.bench_config.process_count == c, br_cl))
+            assert_eq(len(br_c), 1)
+            result = br_c[0]
+            total = 0
+            for rr in result.run_results:
+                total += rr.shortest_iteration_tours[max_gens - 1]
+            avg = total / result.bench_config.repeat_times
+            diff = percent_diff_from_optimal(avg, result)
+            diffs_single_cl.append(diff)
+        diffs_all_cls.append(diffs_single_cl)
+
+    plot_and_save(x_values=x_values,
+                  y_values=diffs_all_cls,
+                  labels=labels_all_pop_sizes,
+                  title=title,
+                  xlabel=xlabel,
+                  ylabel=ylabel,
+                  xticks=core_counts,
+                  file_name=plot_dir + plot_file_name,
+                  config=plot_config)
 
 
 # Core count on X axis, difference from optimal on Y,
