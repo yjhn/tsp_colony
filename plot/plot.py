@@ -71,7 +71,7 @@ Y_BOTTOM = None
 # Caps y_top and y_bottom axis values. Y_TOP and Y_BOTTOM
 # take precedence over these.
 COND_Y_TOP = 1.6
-COND_Y_BOTTOM = 0.93
+COND_Y_BOTTOM = 0.95
 
 # height / width
 PLOT_ASPECT_RATIO = 0.8
@@ -88,12 +88,13 @@ def assert_eq(v1, v2, msg=None):
         assert v1 == v2, msg
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(kw_only=True)
 class PlotConfig:
     y_top: Optional[float]
     y_bottom: Optional[float]
     cond_y_top: Optional[float]
     cond_y_bottom: Optional[float]
+    apply_cond: bool = True
     add_titles: bool
     scale: float
     format: str
@@ -523,15 +524,18 @@ def plot_and_save(*,
         plt.xticks(xticks)
     if yticks is not None:
         plt.yticks(yticks)
+    # If there are only a few X values, do not conditionally set y_top and y_bottom.
+    if len(x_values) <= 10:
+        config.apply_cond = False
     bottom, top = plt.gca().get_ylim()
     y_min = np.min(y_values)
     if config.y_top is not None:
         plt.gca().set_ylim(top=config.y_top)
-    elif top >= config.cond_y_top:
+    elif config.apply_cond and top >= 5 * y_min * config.cond_y_top:
         plt.gca().set_ylim(top=y_min * config.cond_y_top)
     if config.y_bottom is not None:
         plt.gca().set_ylim(bottom=config.y_bottom)
-    elif bottom <= config.cond_y_bottom:
+    elif config.apply_cond and bottom <= 0.2 * y_min * config.cond_y_bottom:
         plt.gca().set_ylim(bottom=y_min * config.cond_y_bottom)
     # plt.yscale("log")
     # plt.xscale("log")
@@ -716,6 +720,7 @@ def plot_paco_cores_diff_from_opt_test_cases(
     # title = f"{ALGO_DISPLAY_NAMES[algo]}, $K = {max_gens}$ kart\\~{{ų}}, $P = {pop_size}$"
     # plot_file_name = f"cores_diff_from_opt_test_cases_{algo}_p{pop_size}"
 
+    plot_config.apply_cond = False
     plot_and_save(x_values=x_values,
                   y_values=diffs_all_test_cases,
                   labels=labels_all_test_cases,
@@ -768,6 +773,7 @@ def plot_abc_cores_diff_from_opt_test_cases(
             diffs_all_core_counts.append(diff)
         diffs_all_test_cases.append(diffs_all_core_counts)
 
+    plot_config.apply_cond = False
     plot_and_save(x_values=x_values,
                   y_values=diffs_all_test_cases,
                   labels=labels_all_test_cases,
@@ -826,6 +832,7 @@ def plot_paco_cores_diff_from_opt_generations(
             diffs_single_gens_count.append(diff)
         diffs_all_gens_counts.append(diffs_single_gens_count)
 
+    plot_config.apply_cond = False
     plot_and_save(x_values=x_values,
                   y_values=diffs_all_gens_counts,
                   labels=labels_all_gens_counts,
