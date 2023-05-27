@@ -68,6 +68,10 @@ PLOT_SCALE = 1.0
 # For controlling Y axis range (ylim)
 Y_TOP = None
 Y_BOTTOM = None
+# Caps y_top and y_bottom axis values. Y_TOP and Y_BOTTOM
+# take precedence over these.
+COND_Y_TOP = 1.6
+COND_Y_BOTTOM = 0.93
 
 # height / width
 PLOT_ASPECT_RATIO = 0.8
@@ -88,6 +92,8 @@ def assert_eq(v1, v2, msg=None):
 class PlotConfig:
     y_top: Optional[float]
     y_bottom: Optional[float]
+    cond_y_top: Optional[float]
+    cond_y_bottom: Optional[float]
     add_titles: bool
     scale: float
     format: str
@@ -183,6 +189,14 @@ def main():
                         type=float,
                         required=False,
                         default=Y_BOTTOM)
+    parser.add_argument("--cond-y-top",
+                        type=float,
+                        required=False,
+                        default=COND_Y_TOP)
+    parser.add_argument("--cond-y-bottom",
+                        type=float,
+                        required=False,
+                        default=COND_Y_BOTTOM)
     # Whether to add diagram title to the specified plot kind.
     # Currently only affects gens_diff_excg.
     parser.add_argument("--no-titles",
@@ -199,7 +213,9 @@ def main():
                              y_bottom=args.y_bottom,
                              add_titles=not args.no_titles,
                              scale=args.plot_scale,
-                             format=args.plot_format)
+                             format=args.plot_format,
+                             cond_y_top=args.cond_y_top,
+                             cond_y_bottom=args.cond_y_bottom)
 
     # algos = list(map(lambda x: ALGO_TO_FILE_NAME_PART[x], args.algorithms))
     # algos = list(map(lambda x: ALGO_TO_UPPER[x], args.algorithms))
@@ -507,7 +523,16 @@ def plot_and_save(*,
         plt.xticks(xticks)
     if yticks is not None:
         plt.yticks(yticks)
-    plt.gca().set_ylim(top=config.y_top, bottom=config.y_bottom)
+    bottom, top = plt.gca().get_ylim()
+    y_min = np.min(y_values)
+    if config.y_top is not None:
+        plt.gca().set_ylim(top=config.y_top)
+    elif top >= config.cond_y_top:
+        plt.gca().set_ylim(top=y_min * config.cond_y_top)
+    if config.y_bottom is not None:
+        plt.gca().set_ylim(bottom=config.y_bottom)
+    elif bottom <= config.cond_y_bottom:
+        plt.gca().set_ylim(bottom=y_min * config.cond_y_bottom)
     # plt.yscale("log")
     # plt.xscale("log")
     plt.legend(loc=legend_location)
@@ -520,6 +545,7 @@ def plot_and_save(*,
         raise FileExistsError(
             f"Will not overwrite existing plot file:\n{final_file_name}")
     print(f"saving plot: {final_file_name}")
+    # plt.ticklabel_format(useOffset=False)
     plt.margins(0.02)
     plt.tight_layout(pad=0.0)
     # dpi is ignored when using pgf
@@ -550,7 +576,9 @@ def plot_paco_gens_diff_from_opt_exc_gens(*, all_results: List[BenchmarkData],
         filter(
             lambda r: r.bench_config.algorithm == "PACO" and r.bench_config.
             problem.name == test_case and r.bench_config.process_count ==
-            core_count, all_results))
+            core_count and r.bench_config.problem.name.endswith(
+                str(r.bench_config.algorithm_constants.population_size)),
+            all_results))
     labels_all_exc_gens = []
     y_values = []
     for exc in exc_gens:
@@ -654,14 +682,17 @@ def plot_paco_cores_diff_from_opt_test_cases(
     bench_results_algo = list(
         filter(
             lambda r: r.bench_config.algorithm == "PACO" and r.bench_config.
-            algorithm_constants.exchange_generations == exc_gens, all_results))
+            problem.name.endswith(
+                str(r.bench_config.algorithm_constants.population_size)) and r.
+            bench_config.algorithm_constants.exchange_generations == exc_gens,
+            all_results))
     labels_all_test_cases = []
     diffs_all_test_cases = []
     for t in test_cases:
         br_t = list(
             filter(lambda r: r.bench_config.problem.name == t,
                    bench_results_algo))
-        print_file_names(br_t)
+        # print_file_names(br_t)
         labels_all_test_cases.append(f"\\texttt{{{t}}}")
         diffs_all_core_counts = []
         for c in core_counts:
@@ -765,7 +796,9 @@ def plot_paco_cores_diff_from_opt_generations(
         filter(
             lambda r: r.bench_config.algorithm == "PACO" and r.bench_config.
             algorithm_constants.exchange_generations == exc_gens and r.
-            bench_config.problem.name == test_case, all_results))
+            bench_config.problem.name.endswith(
+                str(r.bench_config.algorithm_constants.population_size)
+            ) and r.bench_config.problem.name == test_case, all_results))
     labels_all_gens_counts = []
     diffs_all_gens_counts = []
     # TODO: include generation 0
@@ -882,7 +915,10 @@ def plot_cores_diff_from_opt_algos(*, all_results: List[BenchmarkData],
             bench_config.algorithm_constants.exchange_generations == exc_gens
             and r.bench_config.algorithm_constants.colony_size in
             [None, pop_size] and r.bench_config.algorithm_constants.capital_l
-            in [None, capital_l], all_results))
+            in [None, capital_l] and (r.bench_config.problem.name.endswith(
+                str(r.bench_config.algorithm_constants.population_size)
+            ) or r.bench_config.algorithm_constants.population_size is None),
+            all_results))
     # print_file_names(br_init)
     labels_all_algos = []
     diffs_all_algos = []
