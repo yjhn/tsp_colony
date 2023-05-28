@@ -1,0 +1,916 @@
+{
+  "bench_config": {
+    "process_count": 6,
+    "problem": {
+      "name": "eil76",
+      "optimal_length": 538
+    },
+    "algorithm": "CABC",
+    "algorithm_constants": {
+      "max_iterations": 4000,
+      "colony_size": 20,
+      "exchange_generations": 2,
+      "nl_max": 5,
+      "p_cp": 0.8,
+      "p_rc": 0.5,
+      "p_l": 0.2,
+      "l_min": 2,
+      "l_max_mul": 0.5,
+      "r": 1.0,
+      "capital_l": 2.0,
+      "lowercase_q": 3,
+      "k": 16.0
+    },
+    "benchmark_start_time_millis": 1685257554702,
+    "repeat_times": 10
+  },
+  "benchmark_duration_millis": 11519,
+  "run_results": [
+    {
+      "run_number": 0,
+      "found_optimal_tour": false,
+      "shortest_found_tour": 544,
+      "iteration_reached": 4000,
+      "shortest_iteration_tours": [
+        [
+          1,
+          622
+        ],
+        [
+          2,
+          596
+        ],
+        [
+          4,
+          591
+        ],
+        [
+          7,
+          581
+        ],
+        [
+          13,
+          575
+        ],
+        [
+          14,
+          574
+        ],
+        [
+          16,
+          573
+        ],
+        [
+          18,
+          566
+        ],
+        [
+          22,
+          564
+        ],
+        [
+          32,
+          563
+        ],
+        [
+          36,
+          561
+        ],
+        [
+          44,
+          560
+        ],
+        [
+          52,
+          559
+        ],
+        [
+          60,
+          554
+        ],
+        [
+          84,
+          552
+        ],
+        [
+          94,
+          551
+        ],
+        [
+          96,
+          549
+        ],
+        [
+          116,
+          548
+        ],
+        [
+          118,
+          547
+        ],
+        [
+          122,
+          546
+        ],
+        [
+          142,
+          545
+        ],
+        [
+          186,
+          544
+        ],
+        [
+          4000,
+          544
+        ]
+      ],
+      "avg_iter_time_non_exch_micros": 44.621,
+      "avg_iter_time_exch_micros": 511.85492,
+      "duration_millis": 1116
+    },
+    {
+      "run_number": 1,
+      "found_optimal_tour": false,
+      "shortest_found_tour": 544,
+      "iteration_reached": 4000,
+      "shortest_iteration_tours": [
+        [
+          1,
+          616
+        ],
+        [
+          2,
+          593
+        ],
+        [
+          8,
+          587
+        ],
+        [
+          14,
+          584
+        ],
+        [
+          18,
+          583
+        ],
+        [
+          20,
+          579
+        ],
+        [
+          24,
+          575
+        ],
+        [
+          26,
+          571
+        ],
+        [
+          28,
+          566
+        ],
+        [
+          32,
+          564
+        ],
+        [
+          34,
+          563
+        ],
+        [
+          40,
+          557
+        ],
+        [
+          46,
+          556
+        ],
+        [
+          66,
+          555
+        ],
+        [
+          76,
+          551
+        ],
+        [
+          90,
+          550
+        ],
+        [
+          108,
+          549
+        ],
+        [
+          122,
+          544
+        ],
+        [
+          4000,
+          544
+        ]
+      ],
+      "avg_iter_time_non_exch_micros": 43.475,
+      "avg_iter_time_exch_micros": 524.13007,
+      "duration_millis": 1140
+    },
+    {
+      "run_number": 2,
+      "found_optimal_tour": false,
+      "shortest_found_tour": 549,
+      "iteration_reached": 4000,
+      "shortest_iteration_tours": [
+        [
+          1,
+          596
+        ],
+        [
+          4,
+          590
+        ],
+        [
+          10,
+          575
+        ],
+        [
+          16,
+          571
+        ],
+        [
+          20,
+          570
+        ],
+        [
+          24,
+          566
+        ],
+        [
+          34,
+          565
+        ],
+        [
+          38,
+          563
+        ],
+        [
+          40,
+          562
+        ],
+        [
+          51,
+          561
+        ],
+        [
+          56,
+          558
+        ],
+        [
+          68,
+          557
+        ],
+        [
+          78,
+          556
+        ],
+        [
+          79,
+          555
+        ],
+        [
+          122,
+          554
+        ],
+        [
+          442,
+          550
+        ],
+        [
+          451,
+          549
+        ],
+        [
+          4000,
+          549
+        ]
+      ],
+      "avg_iter_time_non_exch_micros": 44.0885,
+      "avg_iter_time_exch_micros": 518.5733,
+      "duration_millis": 1128
+    },
+    {
+      "run_number": 3,
+      "found_optimal_tour": false,
+      "shortest_found_tour": 545,
+      "iteration_reached": 4000,
+      "shortest_iteration_tours": [
+        [
+          1,
+          601
+        ],
+        [
+          5,
+          591
+        ],
+        [
+          8,
+          587
+        ],
+        [
+          12,
+          578
+        ],
+        [
+          18,
+          572
+        ],
+        [
+          19,
+          565
+        ],
+        [
+          28,
+          563
+        ],
+        [
+          36,
+          562
+        ],
+        [
+          37,
+          559
+        ],
+        [
+          40,
+          558
+        ],
+        [
+          45,
+          556
+        ],
+        [
+          754,
+          555
+        ],
+        [
+          768,
+          554
+        ],
+        [
+          782,
+          553
+        ],
+        [
+          812,
+          552
+        ],
+        [
+          826,
+          549
+        ],
+        [
+          828,
+          546
+        ],
+        [
+          865,
+          545
+        ],
+        [
+          4000,
+          545
+        ]
+      ],
+      "avg_iter_time_non_exch_micros": 42.3185,
+      "avg_iter_time_exch_micros": 509.49023,
+      "duration_millis": 1106
+    },
+    {
+      "run_number": 4,
+      "found_optimal_tour": false,
+      "shortest_found_tour": 547,
+      "iteration_reached": 4000,
+      "shortest_iteration_tours": [
+        [
+          1,
+          602
+        ],
+        [
+          2,
+          580
+        ],
+        [
+          4,
+          577
+        ],
+        [
+          6,
+          576
+        ],
+        [
+          8,
+          574
+        ],
+        [
+          14,
+          570
+        ],
+        [
+          18,
+          568
+        ],
+        [
+          23,
+          565
+        ],
+        [
+          24,
+          562
+        ],
+        [
+          40,
+          559
+        ],
+        [
+          52,
+          558
+        ],
+        [
+          58,
+          555
+        ],
+        [
+          68,
+          554
+        ],
+        [
+          128,
+          553
+        ],
+        [
+          782,
+          551
+        ],
+        [
+          820,
+          549
+        ],
+        [
+          833,
+          548
+        ],
+        [
+          1416,
+          547
+        ],
+        [
+          4000,
+          547
+        ]
+      ],
+      "avg_iter_time_non_exch_micros": 43.178,
+      "avg_iter_time_exch_micros": 518.28815,
+      "duration_millis": 1125
+    },
+    {
+      "run_number": 5,
+      "found_optimal_tour": false,
+      "shortest_found_tour": 543,
+      "iteration_reached": 4000,
+      "shortest_iteration_tours": [
+        [
+          1,
+          609
+        ],
+        [
+          2,
+          602
+        ],
+        [
+          4,
+          594
+        ],
+        [
+          8,
+          588
+        ],
+        [
+          9,
+          583
+        ],
+        [
+          14,
+          577
+        ],
+        [
+          20,
+          576
+        ],
+        [
+          24,
+          575
+        ],
+        [
+          26,
+          567
+        ],
+        [
+          42,
+          566
+        ],
+        [
+          50,
+          565
+        ],
+        [
+          56,
+          563
+        ],
+        [
+          63,
+          561
+        ],
+        [
+          70,
+          560
+        ],
+        [
+          72,
+          558
+        ],
+        [
+          78,
+          556
+        ],
+        [
+          104,
+          554
+        ],
+        [
+          768,
+          553
+        ],
+        [
+          864,
+          549
+        ],
+        [
+          881,
+          547
+        ],
+        [
+          882,
+          544
+        ],
+        [
+          1164,
+          543
+        ],
+        [
+          4000,
+          543
+        ]
+      ],
+      "avg_iter_time_non_exch_micros": 44.098,
+      "avg_iter_time_exch_micros": 516.88745,
+      "duration_millis": 1124
+    },
+    {
+      "run_number": 6,
+      "found_optimal_tour": false,
+      "shortest_found_tour": 543,
+      "iteration_reached": 4000,
+      "shortest_iteration_tours": [
+        [
+          1,
+          606
+        ],
+        [
+          2,
+          596
+        ],
+        [
+          5,
+          594
+        ],
+        [
+          6,
+          593
+        ],
+        [
+          9,
+          591
+        ],
+        [
+          10,
+          583
+        ],
+        [
+          12,
+          580
+        ],
+        [
+          14,
+          570
+        ],
+        [
+          18,
+          566
+        ],
+        [
+          34,
+          563
+        ],
+        [
+          46,
+          560
+        ],
+        [
+          60,
+          558
+        ],
+        [
+          74,
+          555
+        ],
+        [
+          92,
+          551
+        ],
+        [
+          102,
+          550
+        ],
+        [
+          592,
+          549
+        ],
+        [
+          598,
+          547
+        ],
+        [
+          610,
+          544
+        ],
+        [
+          662,
+          543
+        ],
+        [
+          4000,
+          543
+        ]
+      ],
+      "avg_iter_time_non_exch_micros": 46.0575,
+      "avg_iter_time_exch_micros": 528.4002,
+      "duration_millis": 1151
+    },
+    {
+      "run_number": 7,
+      "found_optimal_tour": false,
+      "shortest_found_tour": 543,
+      "iteration_reached": 4000,
+      "shortest_iteration_tours": [
+        [
+          1,
+          601
+        ],
+        [
+          2,
+          588
+        ],
+        [
+          6,
+          585
+        ],
+        [
+          8,
+          580
+        ],
+        [
+          14,
+          575
+        ],
+        [
+          16,
+          573
+        ],
+        [
+          24,
+          569
+        ],
+        [
+          28,
+          567
+        ],
+        [
+          32,
+          565
+        ],
+        [
+          34,
+          563
+        ],
+        [
+          46,
+          560
+        ],
+        [
+          52,
+          557
+        ],
+        [
+          58,
+          551
+        ],
+        [
+          81,
+          550
+        ],
+        [
+          88,
+          549
+        ],
+        [
+          90,
+          546
+        ],
+        [
+          106,
+          545
+        ],
+        [
+          542,
+          544
+        ],
+        [
+          1876,
+          543
+        ],
+        [
+          4000,
+          543
+        ]
+      ],
+      "avg_iter_time_non_exch_micros": 42.1065,
+      "avg_iter_time_exch_micros": 579.7824,
+      "duration_millis": 1246
+    },
+    {
+      "run_number": 8,
+      "found_optimal_tour": false,
+      "shortest_found_tour": 547,
+      "iteration_reached": 4000,
+      "shortest_iteration_tours": [
+        [
+          1,
+          596
+        ],
+        [
+          2,
+          594
+        ],
+        [
+          4,
+          585
+        ],
+        [
+          6,
+          584
+        ],
+        [
+          13,
+          574
+        ],
+        [
+          20,
+          571
+        ],
+        [
+          24,
+          563
+        ],
+        [
+          34,
+          558
+        ],
+        [
+          40,
+          555
+        ],
+        [
+          52,
+          554
+        ],
+        [
+          60,
+          553
+        ],
+        [
+          76,
+          551
+        ],
+        [
+          84,
+          550
+        ],
+        [
+          108,
+          548
+        ],
+        [
+          146,
+          547
+        ],
+        [
+          4000,
+          547
+        ]
+      ],
+      "avg_iter_time_non_exch_micros": 42.575,
+      "avg_iter_time_exch_micros": 571.7164,
+      "duration_millis": 1231
+    },
+    {
+      "run_number": 9,
+      "found_optimal_tour": false,
+      "shortest_found_tour": 544,
+      "iteration_reached": 4000,
+      "shortest_iteration_tours": [
+        [
+          1,
+          596
+        ],
+        [
+          2,
+          592
+        ],
+        [
+          4,
+          587
+        ],
+        [
+          10,
+          576
+        ],
+        [
+          14,
+          574
+        ],
+        [
+          18,
+          572
+        ],
+        [
+          26,
+          565
+        ],
+        [
+          28,
+          561
+        ],
+        [
+          46,
+          556
+        ],
+        [
+          58,
+          554
+        ],
+        [
+          78,
+          552
+        ],
+        [
+          82,
+          551
+        ],
+        [
+          90,
+          549
+        ],
+        [
+          950,
+          548
+        ],
+        [
+          989,
+          547
+        ],
+        [
+          998,
+          544
+        ],
+        [
+          4000,
+          544
+        ]
+      ],
+      "avg_iter_time_non_exch_micros": 43.145,
+      "avg_iter_time_exch_micros": 517.86444,
+      "duration_millis": 1124
+    }
+  ]
+}
