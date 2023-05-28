@@ -29,7 +29,7 @@ PLOT_KINDS = [
     "cores_diff_algos",
     "gens_diff_popsizes",
     "cores_diff_popsizes",
-    "relative_times",
+    # "relative_times", # does not exist
     "gens_diff_cls",
     "cores_diff_cls"  # neįdomus, turbūt nenaudosiu
 ]
@@ -71,7 +71,7 @@ Y_BOTTOM = None
 # Caps y_top and y_bottom axis values. Y_TOP and Y_BOTTOM
 # take precedence over these.
 COND_Y_TOP = 1.6
-COND_Y_BOTTOM = 0.95
+COND_Y_BOTTOM = 0.9
 
 # height / width
 PLOT_ASPECT_RATIO = 0.8
@@ -94,7 +94,7 @@ class PlotConfig:
     y_bottom: Optional[float]
     cond_y_top: Optional[float]
     cond_y_bottom: Optional[float]
-    apply_cond: bool = True
+    apply_cond: bool
     add_titles: bool
     scale: float
     format: str
@@ -198,6 +198,10 @@ def main():
                         type=float,
                         required=False,
                         default=COND_Y_BOTTOM)
+    parser.add_argument("--dont-apply-cond",
+                        type=bool,
+                        required=False,
+                        default=False)
     # Whether to add diagram title to the specified plot kind.
     # Currently only affects gens_diff_excg.
     parser.add_argument("--no-titles",
@@ -216,7 +220,8 @@ def main():
                              scale=args.plot_scale,
                              format=args.plot_format,
                              cond_y_top=args.cond_y_top,
-                             cond_y_bottom=args.cond_y_bottom)
+                             cond_y_bottom=args.cond_y_bottom,
+                             apply_cond=not args.dont_apply_cond)
 
     # algos = list(map(lambda x: ALGO_TO_FILE_NAME_PART[x], args.algorithms))
     # algos = list(map(lambda x: ALGO_TO_UPPER[x], args.algorithms))
@@ -528,14 +533,22 @@ def plot_and_save(*,
     if len(x_values) <= 10:
         config.apply_cond = False
     bottom, top = plt.gca().get_ylim()
-    y_min = np.min(y_values)
+    y_min = 100000000
+    y_min_max = 0
+    for i in range(len(y_values)):
+        mm = np.min(y_values[i])
+        if mm > y_min_max:
+            y_min_max = mm
+        if mm < y_min:
+            y_min = mm
+    # print("y_min", y_min, "y_min_max", y_min_max)
     if config.y_top is not None:
         plt.gca().set_ylim(top=config.y_top)
-    elif config.apply_cond and top >= 5 * y_min * config.cond_y_top:
-        plt.gca().set_ylim(top=y_min * config.cond_y_top)
+    elif config.apply_cond and top >= y_min_max * config.cond_y_top:
+        plt.gca().set_ylim(top=y_min_max * config.cond_y_top)
     if config.y_bottom is not None:
         plt.gca().set_ylim(bottom=config.y_bottom)
-    elif config.apply_cond and bottom <= 0.2 * y_min * config.cond_y_bottom:
+    elif config.apply_cond:  # and bottom <= 0.8 * y_min * config.cond_y_bottom:
         plt.gca().set_ylim(bottom=y_min * config.cond_y_bottom)
     # plt.yscale("log")
     # plt.xscale("log")
@@ -583,6 +596,7 @@ def plot_paco_gens_diff_from_opt_exc_gens(*, all_results: List[BenchmarkData],
             core_count and r.bench_config.problem.name.endswith(
                 str(r.bench_config.algorithm_constants.population_size)),
             all_results))
+    # print_file_names(br_init)
     labels_all_exc_gens = []
     y_values = []
     for exc in exc_gens:
@@ -591,7 +605,6 @@ def plot_paco_gens_diff_from_opt_exc_gens(*, all_results: List[BenchmarkData],
             filter(
                 lambda r: r.bench_config.algorithm_constants.
                 exchange_generations == exc, br_init))
-        # print_file_names(br_init)
         assert_eq(len(br_exc), 1)
         result = br_exc[0]
         gen_tour_lengths = found_tours_avg(result.run_results,
@@ -626,7 +639,7 @@ def plot_abc_gens_diff_from_opt_exc_gens(*, all_results: List[BenchmarkData],
     if core_count == 1:
         print("gens_diff_excg graph is pointless with 1 core")
         return
-    title = f"{algo}, \\texttt{{{test_case}}}, $B = {core_count}$"
+    title = f"{algo}, \\texttt{{{test_case}}}, $B = {core_count}$, $P = {pop_size}$"
     plot_file_name = f"gens_diff_from_opt_exc_gens_{test_case}_{algo}_m{max_gens}_c{core_count}_p{pop_size}_cl{capital_l}"
     x_values = np.arange(1, max_gens + 1)
     xlabel = ITERATIONS_AXIS_LABEL
@@ -714,7 +727,7 @@ def plot_paco_cores_diff_from_opt_test_cases(
         diffs_all_test_cases.append(diffs_all_core_counts)
 
     # if len(exc_gens) == 1:
-    title = f"PACO, $D_m = {exc_gens}$, $G = {max_gens}$"
+    title = f"PACO, $D_m = {exc_gens}$, $i_{{maks}} = {max_gens}$"
     plot_file_name = f"cores_diff_from_opt_test_cases_PACO_egen_{exc_gens}_m{max_gens}"
     # else:
     # title = f"{ALGO_DISPLAY_NAMES[algo]}, $K = {max_gens}$ kart\\~{{ų}}, $P = {pop_size}$"
@@ -809,10 +822,10 @@ def plot_paco_cores_diff_from_opt_generations(
     diffs_all_gens_counts = []
     # TODO: include generation 0
     for g in range(gens_start, max_gens, gens_step):
-        if GENS_NAME == "k":
-            labels_all_gens_counts.append(f"$K = {str(g + 1)}$")
-        elif GENS_NAME == "kartos":
-            labels_all_gens_counts.append(f"${str(g + 1)}$ kart\\~{{ų}}")
+        # if GENS_NAME == "k":
+        # labels_all_gens_counts.append(f"$K = {str(g + 1)}$")
+        # elif GENS_NAME == "kartos":
+        labels_all_gens_counts.append(f"${str(g + 1)}$ iteracijų")
         diffs_single_gens_count = []
         for c in core_counts:
             br_c = list(
@@ -865,14 +878,15 @@ def plot_abc_cores_diff_from_opt_generations(
             algorithm_constants.exchange_generations == exc_gens and r.
             bench_config.problem.name == test_case and r.bench_config.
             algorithm_constants.colony_size == pop_size, all_results))
+    # print_file_names(bench_results_algo)
     labels_all_gens_counts = []
     diffs_all_gens_counts = []
     # TODO: include generation 0
     for g in range(gens_start, max_gens, gens_step):
-        if GENS_NAME == "k":
-            labels_all_gens_counts.append(f"$K = {str(g + 1)}$")
-        elif GENS_NAME == "kartos":
-            labels_all_gens_counts.append(f"${str(g + 1)}$ kart\\~{{ų}}")
+        # if GENS_NAME == "k":
+        # labels_all_gens_counts.append(f"$K = {str(g + 1)}$")
+        # elif GENS_NAME == "kartos":
+        labels_all_gens_counts.append(f"${str(g + 1)}$ iteracijų")
         diffs_single_gens_count = []
         for c in core_counts:
             br_c = list(
@@ -910,7 +924,7 @@ def plot_cores_diff_from_opt_algos(*, all_results: List[BenchmarkData],
                                    capital_l: int, max_gens: int,
                                    pop_size: int, plot_dir: str,
                                    plot_config: PlotConfig):
-    title = f"\\texttt{{{test_case}}}, $D_m = {exc_gens}$, $K = {max_gens}$ kart\\~{{ų}} $P_{{(CABC, qCABC)}} = {pop_size}$, $L = {capital_l}$"
+    title = f"\\texttt{{{test_case}}}, $D_m = {exc_gens}$, $i_{{maks}} = {max_gens}$, $P = {pop_size}$, $L = {capital_l}$"
     plot_file_name = f"cores_diff_from_opt_algos_{test_case}_mgen_{max_gens}_egen_{exc_gens}_p{pop_size}_l{capital_l}"
     x_values = core_counts
     xlabel = CORE_COUNT_AXIS_LABEL
@@ -1068,7 +1082,7 @@ def plot_abc_cores_diff_from_opt_capital_ls(
         *, all_results: List[BenchmarkData], test_case: str, algo: str,
         core_counts: List[int], exc_gens: int, max_gens: int, pop_size: int,
         plot_dir: str, capital_ls: List[int], plot_config: PlotConfig):
-    title = f"{algo}, \\texttt{{{test_case}}}, $D_m = {exc_gens}$, $P = {pop_size}"
+    title = f"{algo}, \\texttt{{{test_case}}}, $D_m = {exc_gens}$, $P = {pop_size}$"
     plot_file_name = f"cores_diff_from_opt_capital_ls_{test_case}_{algo}_mgen{max_gens}_egen{exc_gens}_p{pop_size}"
     br_init = list(
         filter(
@@ -1123,17 +1137,17 @@ def plot_abc_cores_diff_from_opt_pop_sizes(
         pop_sizes: List[int], plot_dir: str, plot_config: PlotConfig):
 
     popstring = '_'.join(map(str, pop_sizes))
-    if GENS_NAME == "kartos":
-        title = f"{algo}, \\texttt{{{test_case}}}, ${max_gens}$ kart\\~{{ų}}"
-    elif GENS_NAME == "k":
-        title = f"{algo}, \\texttt{{{test_case}}}, $D_m = {exc_gens}$, $K = {max_gens}$"
+    # if GENS_NAME == "kartos":
+    # title = f"{algo}, \\texttt{{{test_case}}}, ${max_gens}$ iteracijų"
+    # elif GENS_NAME == "k":
+    title = f"{algo}, \\texttt{{{test_case}}}, $D_m = {exc_gens}$, $i_{{maks}} = {max_gens}$"
     plot_file_name = f"cores_diff_from_opt_pop_sizes_{test_case}_{algo}_mgen_{max_gens}_egen_{exc_gens}_p{popstring}"
     br_init = list(
         filter(
-            lambda r: r.bench_config.problem.name == test_case and r.
-            bench_config.algorithm_constants.exchange_generations == exc_gens
-            and r.bench_config.algorithm_constants.capital_l == capital_l,
-            all_results))
+            lambda r: r.bench_config.algorithm == algo and r.bench_config.
+            problem.name == test_case and r.bench_config.algorithm_constants.
+            exchange_generations == exc_gens and r.bench_config.
+            algorithm_constants.capital_l == capital_l, all_results))
     # print_file_names(br_init)
     x_values = core_counts
     xlabel = CORE_COUNT_AXIS_LABEL
