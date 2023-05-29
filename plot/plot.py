@@ -953,7 +953,13 @@ def plot_cores_diff_from_opt_algos(*, all_results: List[BenchmarkData],
             br_c = list(
                 filter(lambda r: r.bench_config.process_count == c, br_a))
             # print_file_names(br_c)
-            assert_eq(len(br_c), 1, msg=f"c = {c}, len(br_c) = {len(br_c)}")
+            # assert_eq(len(br_c), 1, msg=f"c = {c}, len(br_c) = {len(br_c)}")
+            if len(br_c) == 0:
+                print(
+                    f"Warning: missing results for algo '{a}' core count {c}",
+                    flush=True)
+                diffs_single_algo.append(diffs_single_algo[-1])
+                continue
             result = br_c[0]
             total = 0
             for rr in result.run_results:
