@@ -805,7 +805,8 @@ def plot_paco_cores_diff_from_opt_generations(
         *, all_results: List[BenchmarkData], test_case: str,
         core_counts: List[int], exc_gens: int, max_gens: int, gens_start: int,
         gens_step: int, plot_dir: str, plot_config: PlotConfig):
-    title = f"PACO, \\texttt{{{test_case}}}, $D_m = {exc_gens}$"
+    # title = f"PACO, \\texttt{{{test_case}}}, $D_m = {exc_gens}$"
+    title = f"PACO, \\texttt{{{test_case}}}"
     plot_file_name = f"cores_diff_from_opt_gens_{test_case}_PACO_egen_{exc_gens}"
     x_values = core_counts
     xlabel = CORE_COUNT_AXIS_LABEL
@@ -865,7 +866,8 @@ def plot_abc_cores_diff_from_opt_generations(
         core_counts: List[int], exc_gens: int, max_gens: int, algo: str,
         capital_l: int, pop_size: int, gens_start: int, gens_step: int,
         plot_dir: str, plot_config: PlotConfig):
-    title = f"{algo}, \\texttt{{{test_case}}}, $D_m = {exc_gens}$, $P = {pop_size}$, $L = {capital_l}$"
+    # title = f"{algo}, \\texttt{{{test_case}}}, $D_m = {exc_gens}$, $P = {pop_size}$, $L = {capital_l}$"
+    title = f"{algo}, \\texttt{{{test_case}}}"
     plot_file_name = f"cores_diff_from_opt_gens_{test_case}_{algo}_egen_{exc_gens}_cs{pop_size}_cl{capital_l}"
     x_values = core_counts
     xlabel = CORE_COUNT_AXIS_LABEL
@@ -924,7 +926,8 @@ def plot_cores_diff_from_opt_algos(*, all_results: List[BenchmarkData],
                                    capital_l: int, max_gens: int,
                                    pop_size: int, plot_dir: str,
                                    plot_config: PlotConfig):
-    title = f"\\texttt{{{test_case}}}, $D_m = {exc_gens}$, $i_{{maks}} = {max_gens}$, $P = {pop_size}$, $L = {capital_l}$"
+    # title = f"\\texttt{{{test_case}}}, $D_m = {exc_gens}$, $i_{{maks}} = {max_gens}$, $P = {pop_size}$, $L = {capital_l}$"
+    title = f"\\texttt{{{test_case}}}, $i_{{maks}} = {max_gens}$"
     plot_file_name = f"cores_diff_from_opt_algos_{test_case}_mgen_{max_gens}_egen_{exc_gens}_p{pop_size}_l{capital_l}"
     x_values = core_counts
     xlabel = CORE_COUNT_AXIS_LABEL
